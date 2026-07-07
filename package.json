@@ -1,0 +1,13 @@
+{
+  "name": "news-collector",
+  "version": "1.0.0",
+  "description": "实时新闻收集网站 - 用户上传新闻，查看排行榜",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "socket.io": "^4.8.0"
+  }
+}

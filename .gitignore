@@ -1,0 +1,7 @@
+node_modules/
+# 数据文件包含用户密码哈希，建议不要上传
+data/users.json
+data/tokens.json
+# 操作系统文件
+.DS_Store
+Thumbs.db
