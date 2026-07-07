@@ -37,7 +37,7 @@
         <h3>📝 分享新闻</h3>
         <form id="newsForm" autocomplete="off">
           <div class="form-row">
-            <input type="text" id="titleInput" placeholder="新闻标题 *" maxlength="200" required>
+            <input type="text" id="titleInput" placeholder="新闻标题（5-50字）*" maxlength="50" required>
             <input type="url" id="urlInput" placeholder="链接（可选）" maxlength="500">
           </div>
           <textarea id="summaryInput" placeholder="摘要或评论（可选）" maxlength="1000" rows="2"></textarea>
@@ -74,6 +74,19 @@
         <div class="log-list" id="logList"></div>
       </div>
     </aside>
+  </div>
+
+  <!-- ═══ 管理员密钥弹窗（面板打开前必须验证） ═══ -->
+  <div class="modal-overlay" id="adminKeyOverlay" style="display:none;">
+    <div class="modal-box">
+      <h3>🔐 管理员验证</h3>
+      <p class="modal-target">请输入管理员密钥以继续</p>
+      <input type="password" id="adminKeyInput" placeholder="输入或粘贴管理员密钥" maxlength="300" autocomplete="off">
+      <div class="modal-actions">
+        <button id="adminKeyCancel" class="btn-outline">取消</button>
+        <button id="adminKeyConfirm" class="btn-primary">验证</button>
+      </div>
+    </div>
   </div>
 
   <!-- ═══ 管理员面板（弹窗） ═══ -->

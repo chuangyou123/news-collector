@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════
-//  新闻收集站 v3 — 前端逻辑（含管理员面板）
+//  新闻收集站 v3 — 前端逻辑（管理密钥加密防护）
 // ═══════════════════════════════════════════════
 
 const socket = io();
@@ -27,7 +27,13 @@ const logList        = $('#logList');
 const newsCount      = $('#newsCount');
 const toastContainer = $('#toastContainer');
 
-// ── 管理员 DOM ────────────────────────────────────
+// ── 管理员密钥 DOM ────────────────────────────────
+const adminKeyOverlay  = $('#adminKeyOverlay');
+const adminKeyInput    = $('#adminKeyInput');
+const adminKeyCancel   = $('#adminKeyCancel');
+const adminKeyConfirm  = $('#adminKeyConfirm');
+
+// ── 管理员面板 DOM ────────────────────────────────
 const adminOverlay    = $('#adminOverlay');
 const adminCloseBtn   = $('#adminCloseBtn');
 const adminDateFilter = $('#adminDateFilter');
@@ -50,7 +56,8 @@ let pwdModalUsername = null;
 let currentUser = null;
 let authToken   = null;
 let mode        = 'login';
-let isAdmin     = false;
+let adminIPOk   = false;   // IP 在白名单中
+let adminKey    = null;    // 已验证的管理密钥（仅内存，绝不持久化）
 
 // ── 模式切换 ──────────────────────────────────────
 function setMode(m) {
@@ -117,8 +124,7 @@ async function onAuthSuccess(data) {
   usernameInput.value = '';
   passwordInput.value = '';
 
-  // 检查管理员权限
-  await checkAdmin();
+  await checkAdminIP();
 }
 
 // ── 退出 ──────────────────────────────────────────
@@ -126,7 +132,7 @@ logoutBtn.addEventListener('click', async () => {
   if (authToken) {
     fetch('/api/logout', { method: 'POST', headers: { 'Authorization': authToken } }).catch(() => {});
   }
-  currentUser = null; authToken = null; isAdmin = false;
+  currentUser = null; authToken = null; adminIPOk = false; adminKey = null;
   localStorage.removeItem('nc_user');
   localStorage.removeItem('nc_token');
   userArea.style.display = 'flex';
@@ -134,6 +140,7 @@ logoutBtn.addEventListener('click', async () => {
   uploadCard.style.display = 'none';
   adminBtn.style.display = 'none';
   adminOverlay.style.display = 'none';
+  adminKeyOverlay.style.display = 'none';
   setMode('login');
   showToast('已退出', 'info');
 });
@@ -152,18 +159,19 @@ logoutBtn.addEventListener('click', async () => {
     userInfo.style.display = 'flex';
     userBadge.textContent = `👤 ${data.username}`;
     uploadCard.style.display = 'block';
-    await checkAdmin();
+    await checkAdminIP();
   } catch {}
 })();
 
-// ── 检查管理员权限 ──────────────────────────────
-async function checkAdmin() {
+// ── 检查管理员 IP（仅检查白名单，不验证密钥） ──
+async function checkAdminIP() {
   try {
     const res = await fetch('/api/admin/check');
     const data = await res.json();
-    isAdmin = data.isAdmin;
-    if (isAdmin) adminBtn.style.display = 'inline-block';
-  } catch { isAdmin = false; }
+    adminIPOk = data.allowed;
+    // 仅 IP 通过时显示齿轮按钮；普通用户完全看不到
+    if (adminIPOk) adminBtn.style.display = 'inline-block';
+  } catch { adminIPOk = false; }
 }
 
 // ═══════════════════════════════════════════════════
@@ -177,6 +185,8 @@ newsForm.addEventListener('submit', async e => {
   e.preventDefault();
   const title = titleInput.value.trim();
   if (!title) { showToast('请输入新闻标题', 'error'); return; }
+  if ([...title].length < 5) { showToast('标题至少 5 个字符', 'error'); return; }
+  if ([...title].length > 50) { showToast('标题最多 50 个字符', 'error'); return; }
   if (!authToken) { showToast('请先登录', 'error'); return; }
 
   const btn = newsForm.querySelector('button');
@@ -218,14 +228,13 @@ socket.on('news-deleted', data => {
   const card = document.querySelector(`[data-id="${data.id}"]`);
   if (card) { card.style.opacity = '0'; card.style.transform = 'translateX(30px)'; card.style.transition = 'all 0.3s'; setTimeout(() => card.remove(), 300); }
   newsCount.textContent = document.querySelectorAll('.news-card').length;
-  // 同时刷新管理员面板
-  if (isAdmin && adminOverlay.style.display !== 'none') loadAdminNews();
+  if (adminKey && adminOverlay.style.display !== 'none') loadAdminNews();
 });
 
 socket.on('leaderboard-updated', lb => renderLeaderboard(lb));
 
 // ═══════════════════════════════════════════════════
-//  渲染函数（新闻 / 排行 / 日志）
+//  渲染函数
 // ═══════════════════════════════════════════════════
 function renderNews(arr) {
   if (!arr || arr.length === 0) {
@@ -275,9 +284,38 @@ function addLog(username, action) {
 function updateStats(news) { newsCount.textContent = news ? news.length : 0; }
 
 // ═══════════════════════════════════════════════════
-//  管理员面板
+//  管理员：密钥验证 → 面板
 // ═══════════════════════════════════════════════════
-adminBtn.addEventListener('click', () => openAdminPanel());
+
+// 点击齿轮 → 弹出密钥输入框
+adminBtn.addEventListener('click', () => {
+  adminKeyInput.value = '';
+  adminKeyOverlay.style.display = 'flex';
+  adminKeyInput.focus();
+});
+adminKeyCancel.addEventListener('click', () => { adminKeyOverlay.style.display = 'none'; });
+adminKeyOverlay.addEventListener('click', e => { if (e.target === adminKeyOverlay) adminKeyOverlay.style.display = 'none'; });
+adminKeyConfirm.addEventListener('click', doVerifyAdminKey);
+adminKeyInput.addEventListener('keydown', e => { if (e.key === 'Enter') doVerifyAdminKey(); });
+
+async function doVerifyAdminKey() {
+  const key = adminKeyInput.value.trim();
+  if (!key) { showToast('请输入管理员密钥', 'error'); return; }
+  adminKeyConfirm.disabled = true; adminKeyConfirm.textContent = '⏳';
+  try {
+    const res = await fetch('/api/admin/auth', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key })
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error || '密钥错误'); }
+    adminKey = key;   // 仅存内存
+    adminKeyOverlay.style.display = 'none';
+    adminKeyInput.value = '';
+    openAdminPanel();
+  } catch (err) { showToast(`❌ ${err.message}`, 'error'); }
+  finally { adminKeyConfirm.disabled = false; adminKeyConfirm.textContent = '验证'; }
+}
+
 adminCloseBtn.addEventListener('click', () => { adminOverlay.style.display = 'none'; });
 
 function openAdminPanel() {
@@ -292,8 +330,7 @@ adminTabs.forEach(tab => {
   tab.addEventListener('click', () => {
     adminTabs.forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
-    const target = tab.dataset.tab;
-    switchAdminTab(target);
+    switchAdminTab(tab.dataset.tab);
   });
 });
 
@@ -304,14 +341,17 @@ function switchAdminTab(tab) {
   if (tab === 'users') loadAdminUsers();
 }
 
-// 日期筛选
 adminDateFilter.addEventListener('change', loadAdminNews);
 
-// 加载每日新闻
+// ── 管理 API（均携带 x-admin-key） ────────────────
+function adminHeaders() {
+  return { 'x-admin-key': adminKey || '' };
+}
+
 async function loadAdminNews() {
   const date = adminDateFilter.value || new Date().toISOString().slice(0, 10);
   try {
-    const res = await fetch(`/api/admin/news?date=${date}`);
+    const res = await fetch(`/api/admin/news?date=${date}`, { headers: adminHeaders() });
     if (!res.ok) throw new Error('无权限');
     const list = await res.json();
     if (list.length === 0) {
@@ -331,35 +371,31 @@ async function loadAdminNews() {
   } catch (err) { adminNewsList.innerHTML = `<div class="empty-state small"><p>加载失败: ${esc(err.message)}</p></div>`; }
 }
 
-// 删除新闻
 window.deleteNews = async function(id) {
   if (!confirm('确定要删除这条新闻吗？')) return;
   try {
-    const res = await fetch(`/api/admin/news/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/admin/news/${id}`, { method: 'DELETE', headers: adminHeaders() });
     if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
     showToast('🗑 新闻已删除', 'success');
     loadAdminNews();
   } catch (err) { showToast(`❌ ${err.message}`, 'error'); }
 };
 
-// 复制当天新闻（无序号，标题以逗号分隔）
 adminCopyToday.addEventListener('click', async () => {
   const date = adminDateFilter.value || new Date().toISOString().slice(0, 10);
   try {
-    const res = await fetch(`/api/admin/news?date=${date}`);
+    const res = await fetch(`/api/admin/news?date=${date}`, { headers: adminHeaders() });
     const list = await res.json();
     if (list.length === 0) { showToast('当天没有新闻', 'info'); return; }
-    // 格式：标题1, 标题2, 标题3
     const text = list.map(item => item.title).join(', ');
     await navigator.clipboard.writeText(text);
     showToast(`📋 已复制 ${list.length} 条新闻标题`, 'success');
   } catch (err) { showToast('复制失败，请手动选择', 'error'); }
 });
 
-// 加载用户列表
 async function loadAdminUsers() {
   try {
-    const res = await fetch('/api/admin/users');
+    const res = await fetch('/api/admin/users', { headers: adminHeaders() });
     if (!res.ok) throw new Error('无权限');
     const list = await res.json();
     if (list.length === 0) {
@@ -383,13 +419,13 @@ async function loadAdminUsers() {
   } catch (err) { adminUserList.innerHTML = `<div class="empty-state small"><p>加载失败</p></div>`; }
 }
 
-// 封禁/解封
 window.toggleBan = async function(username, ban) {
   const action = ban ? '封禁' : '解封';
   if (!confirm(`确定要${action}「${username}」吗？`)) return;
   try {
     const res = await fetch('/api/admin/ban', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...adminHeaders() },
       body: JSON.stringify({ username, banned: ban })
     });
     if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
@@ -412,7 +448,8 @@ pwdModalConfirm.addEventListener('click', async () => {
   if (!pw || pw.length < 4) { showToast('新密码至少 4 位', 'error'); return; }
   try {
     const res = await fetch('/api/admin/reset-password', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...adminHeaders() },
       body: JSON.stringify({ username: pwdModalUsername, newPassword: pw })
     });
     if (!res.ok) { const e = await res.json(); throw new Error(e.error); }

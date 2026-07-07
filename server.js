@@ -12,6 +12,15 @@ const io = new Server(server);
 // ── 管理员 IP 白名单 ──────────────────────────────
 const ADMIN_IPS = ['26.100.68.199', '192.168.10.21', '127.0.0.1', '::1', '::ffff:127.0.0.1'];
 
+// ── 管理员密钥（256字符强密钥，可通过环境变量 ADMIN_KEY 覆盖）────
+const ADMIN_KEY = process.env.ADMIN_KEY || '2d384f9ba42ae0aac8a0e65d4ef40a3698969866981f4d10676dddf923778b9b98d40f89546ce4aa95e414c1caad064f91d78fa97ffbdca8dd8e35120653fc29f019bf4582ab2e18159aff67f44a1eb658bb44776503f304233ad4edc62b08e3b9b1ebcb0c411da948bbf1824a2586643d6c29b87a80ec4153b37051e0d67359';
+
+// 验证管理员密钥
+function verifyAdminKey(rawKey) {
+  if (!rawKey || rawKey.length < 4) return false;
+  return rawKey === ADMIN_KEY;
+}
+
 // ── 数据文件路径 ──────────────────────────────────
 const DATA_DIR = path.join(__dirname, 'data');
 const NEWS_FILE = path.join(DATA_DIR, 'news.json');
@@ -31,6 +40,26 @@ function readJSON(fp) {
 }
 function writeJSON(fp, data) {
   fs.writeFileSync(fp, JSON.stringify(data, null, 2), 'utf-8');
+}
+
+// ── 防注入清理 ────────────────────────────────────
+function sanitize(str) {
+  if (!str || typeof str !== 'string') return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&#34;')
+    .replace(/'/g, '&#39;')
+    .replace(/`/g, '&#96;')
+    .replace(/\$/g, '&#36;')
+    .trim();
+}
+function validateTitle(title) {
+  const len = [...title.trim()].length;  // 按字符（含中文）计数
+  if (len < 5) return '标题至少 5 个字符';
+  if (len > 50) return '标题最多 50 个字符';
+  return null;
 }
 
 // ── 密码 ──────────────────────────────────────────
@@ -112,6 +141,10 @@ function authMiddleware(req, res, next) {
 function adminMiddleware(req, res, next) {
   if (!isAdminIP(req)) {
     return res.status(403).json({ error: '无管理员权限' });
+  }
+  const key = req.headers['x-admin-key'];
+  if (!verifyAdminKey(key)) {
+    return res.status(403).json({ error: '管理员密钥错误' });
   }
   next();
 }
@@ -204,12 +237,27 @@ app.get('/api/news', (req, res) => {
 
 // 发布新闻
 app.post('/api/news', authMiddleware, (req, res) => {
-  const { title, url, summary } = req.body;
+  let { title, url, summary } = req.body;
   const username = req.currentUser;
-  if (!title || !title.trim()) return res.status(400).json({ error: '请输入新闻标题' });
+
+  // 防注入清理
+  title   = sanitize(title);
+  url     = sanitize(url);
+  summary = sanitize(summary);
+
+  // 标题长度校验
+  const titleErr = validateTitle(title);
+  if (titleErr) return res.status(400).json({ error: titleErr });
+
+  // summary 长度限制
+  if (summary.length > 1000) return res.status(400).json({ error: '摘要最多 1000 字符' });
+
+  // URL 长度限制
+  if (url.length > 500) return res.status(400).json({ error: '链接过长' });
+  // 简单 URL 白名单（只允许 http/https）
+  if (url && !/^https?:\/\//.test(url)) return res.status(400).json({ error: '链接必须以 http:// 或 https:// 开头' });
 
   const users = readJSON(USERS_FILE);
-  // ⭐ 封禁检查
   if (users[username] && users[username].banned) {
     return res.status(403).json({ error: '该账号已被封禁，无法发布新闻' });
   }
@@ -218,9 +266,9 @@ app.post('/api/news', authMiddleware, (req, res) => {
   const newsItem = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
     username,
-    title: title.trim(),
-    url: (url || '').trim(),
-    summary: (summary || '').trim(),
+    title: title,
+    url: url,
+    summary: summary,
     time: new Date().toISOString()
   };
 
@@ -239,9 +287,24 @@ app.post('/api/news', authMiddleware, (req, res) => {
 //  管理员 API（仅白名单 IP 可访问）
 // ═══════════════════════════════════════════════════
 
-// 检查当前 IP 是否为管理员
+// 检查当前 IP 是否为管理员（不暴露敏感信息）
 app.get('/api/admin/check', (req, res) => {
-  res.json({ isAdmin: isAdminIP(req) });
+  // 仅返回 IP 是否匹配，不透露任何其他信息
+  res.json({ allowed: isAdminIP(req) });
+});
+
+// 验证管理员密钥
+app.post('/api/admin/auth', (req, res) => {
+  if (!isAdminIP(req)) {
+    return res.status(403).json({ error: '拒绝访问' });
+  }
+  const { key } = req.body;
+  if (!verifyAdminKey(key)) {
+    return res.status(403).json({ error: '密钥错误' });
+  }
+  // 验证通过
+  console.log('🔐 管理员密钥验证通过');
+  res.json({ success: true });
 });
 
 // 获取所有用户
