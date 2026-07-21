@@ -741,6 +741,14 @@ textarea {
 }
 .btn-outline:hover { border-color: var(--primary-light); }
 
+/* 公告栏 */
+.announce-banner { max-width:1200px;margin:0 auto;padding:8px 24px }
+.announce-inner { background:linear-gradient(135deg,#FEF3C7,#FFFBEB);padding:10px 18px;border-radius:10px;display:flex;align-items:center;gap:10px;font-size:0.9rem;border-left:4px solid #F59E0B }
+.announce-icon { font-size:1.2rem }
+.announce-time { color:#888;font-size:0.75rem;white-space:nowrap }
+.btn-warn { background:#FEF3C7;color:#D97706 }
+.btn-warn:hover { background:#FDE68A }
+
 /* ===== 响应式 ===== */
 @media (max-width: 768px) {
   .main-container {

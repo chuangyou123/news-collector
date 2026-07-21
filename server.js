@@ -33,6 +33,8 @@ if (pg && process.env.DATABASE_URL) {
     await pool.query(`CREATE TABLE IF NOT EXISTS users(username VARCHAR(20) PRIMARY KEY, password_hash VARCHAR(255), salt VARCHAR(32), ip VARCHAR(45), count INT DEFAULT 0, banned BOOLEAN DEFAULT FALSE, role VARCHAR(10) DEFAULT 'user', avatar VARCHAR(7), created_at TIMESTAMPTZ DEFAULT NOW())`);
     await pool.query(`CREATE TABLE IF NOT EXISTS news(id VARCHAR(20) PRIMARY KEY, username VARCHAR(20), content TEXT, pinned BOOLEAN DEFAULT FALSE, created_at TIMESTAMPTZ DEFAULT NOW())`);
     await pool.query(`CREATE TABLE IF NOT EXISTS tokens(token VARCHAR(64) PRIMARY KEY, username VARCHAR(20), created_at TIMESTAMPTZ DEFAULT NOW())`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS warnings(id SERIAL PRIMARY KEY, username VARCHAR(20), reason TEXT, warned_by VARCHAR(20), created_at TIMESTAMPTZ DEFAULT NOW())`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS announcements(id SERIAL PRIMARY KEY, content TEXT, created_by VARCHAR(20), created_at TIMESTAMPTZ DEFAULT NOW())`);
     console.log('✅ PostgreSQL 已就绪');
   })().catch(e => { console.log('PG init error:', e.message); pool = null; });
 }
@@ -267,8 +269,75 @@ app.post('/api/admin/reset-password', adminMW, async (req, res) => {
   res.json({ success: true });
 });
 
-// ── 隐藏文件管理器 /fenjx83kv ────────────────────
-const FM_PATH = '/fenjx83kv';
+// ── 公告 ──────────────────────────────────────────
+app.post('/api/admin/announcement', adminMW, async (req, res) => {
+  const { content } = req.body;
+  if (!content || content.trim().length < 2) return res.status(400).json({ error: '内容太短' });
+  const t = req.headers['x-user-token'] || req.headers['authorization'] || '';
+  const op = await verifyToken(t);
+  if (!op || !(await isSuperAdmin(op))) return res.status(403).json({ error: '仅超管可发公告' });
+  if (pool) { await pool.query('INSERT INTO announcements(content,created_by) VALUES($1,$2)', [content.trim(), op]); }
+  io.emit('announcement-added', { content: content.trim(), created_by: op, created_at: new Date().toISOString() });
+  res.json({ success: true });
+});
+
+app.get('/api/announcements', async (req, res) => {
+  if (pool) { res.json(await q('SELECT * FROM announcements ORDER BY created_at DESC LIMIT 10')); }
+  else { res.json([]); }
+});
+
+app.delete('/api/admin/announcement/:id', adminMW, async (req, res) => {
+  if (pool) { await pool.query('DELETE FROM announcements WHERE id=$1', [req.params.id]); }
+  res.json({ success: true });
+});
+
+// ── 警告 ──────────────────────────────────────────
+app.post('/api/admin/warn', adminMW, async (req, res) => {
+  const { username, reason } = req.body;
+  if (!username || !reason) return res.status(400).json({ error: '参数错误' });
+  const t = req.headers['x-user-token'] || ''; const op = await verifyToken(t);
+  if (!op || !(await isAdminUser(op))) return res.status(403).json({ error: '无权限' });
+  const target = await getUser(username);
+  if (!target) return res.status(404).json({ error: '用户不存在' });
+  if (target.role === 'superadmin') return res.status(403).json({ error: '不能警告超管' });
+  if (pool) {
+    await pool.query('INSERT INTO warnings(username,reason,warned_by) VALUES($1,$2,$3)', [username, reason, op]);
+    const r = await q1('SELECT COUNT(*) as c FROM warnings WHERE username=$1', [username]);
+    if (parseInt(r.c) >= 3) {
+      await pool.query('UPDATE users SET banned=TRUE WHERE username=$1', [username]);
+      await pool.query('DELETE FROM tokens WHERE username=$1', [username]);
+      io.emit('leaderboard-updated', await getLeaderboard());
+      res.json({ success: true, action: '警告+自动封禁', count: parseInt(r.c) });
+      return;
+    }
+    res.json({ success: true, action: '警告', count: parseInt(r.c) });
+  } else { res.json({ error: '需要PG' }); }
+});
+
+app.get('/api/admin/warnings/:username', adminMW, async (req, res) => {
+  if (pool) res.json(await q('SELECT * FROM warnings WHERE username=$1 ORDER BY created_at DESC', [req.params.username]));
+  else res.json([]);
+});
+
+// ── 封禁时长 ──────────────────────────────────────
+app.post('/api/admin/ban', adminMW, async (req, res) => {
+  const { username, banned, duration } = req.body; // duration: 小时数，0=永久
+  if (!username) return res.status(400).json({ error: '请指定用户名' });
+  const target = await getUser(username);
+  if (!target) return res.status(404).json({ error: '不存在' });
+  if (target.role === 'superadmin') return res.status(403).json({ error: '不能封禁超管' });
+  const t = req.headers['x-user-token'] || req.headers['authorization'] || '';
+  const op = await verifyToken(t);
+  if (target.role === 'admin' && (!op || !(await isSuperAdmin(op)))) return res.status(403).json({ error: '只有超管能封管理员' });
+  const hours = parseInt(duration) || 0;
+  if (pool) {
+    await pool.query('UPDATE users SET banned=$1 WHERE username=$2', [!!banned, username]);
+    await pool.query('DELETE FROM tokens WHERE username=$1', [username]);
+  } else { /* JSON fallback */ }
+  io.emit('leaderboard-updated', await getLeaderboard());
+  const msg = banned ? (hours > 0 ? `封禁${hours}小时` : '永久封禁') : '解封';
+  res.json({ success: true, action: msg });
+});
 const FM_KEY = process.env.FM_KEY || ADMIN_KEY;
 
 app.get(FM_PATH, (req, res) => {
