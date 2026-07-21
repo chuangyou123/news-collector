@@ -268,6 +268,7 @@ function newsCardHTML(item) {
       <div class="news-meta"><div class="news-username">${esc(item.username)} <span class="pin-badge" style="display:${item.pinned ? 'inline' : 'none'}">📌置顶</span></div><div class="news-time">${timeStr}</div></div>
     </div>
     <div class="news-content">${esc(item.content)}</div>
+    ${adminIPOk ? `<button class="news-del-btn" onclick="event.stopPropagation();deleteNewsDirect('${item.id}')" title="删除此新闻">✕</button>` : ''}
   </div>`;
 }
 function renderLeaderboard(lb) {
@@ -399,6 +400,17 @@ window.deleteNews = async function(id) {
     if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
     showToast('🗑 新闻已删除', 'success');
     loadAdminNews();
+  } catch (err) { showToast(`❌ ${err.message}`, 'error'); }
+};
+
+// 主页直接删除（不进面板）
+window.deleteNewsDirect = async function(id) {
+  if (!confirm('确定要删除这条新闻吗？')) return;
+  if (!adminKey) { showToast('请先点击⚙️输入管理密钥', 'error'); return; }
+  try {
+    const res = await fetch(`/api/admin/news/${id}`, { method: 'DELETE', headers: adminHeaders() });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+    showToast('🗑 已删除', 'success');
   } catch (err) { showToast(`❌ ${err.message}`, 'error'); }
 };
 
