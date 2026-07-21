@@ -221,25 +221,6 @@ app.delete('/api/admin/news/:id', adminMW, async (req, res) => {
   io.emit('leaderboard-updated', await getLeaderboard());
   res.json({ success: true });
 });
-app.post('/api/admin/ban', adminMW, async (req, res) => {
-  const { username, banned } = req.body;
-  if (!username) return res.status(400).json({ error: '请指定用户名' });
-  const target = await getUser(username);
-  if (!target) return res.status(404).json({ error: '不存在' });
-  if (target.role === 'superadmin') return res.status(403).json({ error: '不能封禁超管' });
-  const t = req.headers['x-user-token'] || req.headers['authorization'] || '';
-  const op = await verifyToken(t);
-  if (target.role === 'admin' && (!op || !(await isSuperAdmin(op)))) return res.status(403).json({ error: '只有超管能封管理员' });
-  if (pool) {
-    await pool.query('UPDATE users SET banned=$1 WHERE username=$2', [!!banned, username]);
-    await pool.query('DELETE FROM tokens WHERE username=$1', [username]);
-  } else {
-    const u = readJ(USERS_FILE); u[username].banned = !!banned; writeJ(USERS_FILE, u);
-    const tk = readJ(TOKENS_FILE); for (const k of Object.keys(tk)) { if (tk[k] === username) delete tk[k]; } writeJ(TOKENS_FILE, tk);
-  }
-  io.emit('leaderboard-updated', await getLeaderboard());
-  res.json({ success: true, action: banned ? '封禁' : '解封' });
-});
 app.post('/api/admin/set-role', adminMW, async (req, res) => {
   const { username, role } = req.body;
   if (!username || !['admin', 'user'].includes(role)) return res.status(400).json({ error: '参数错误' });
