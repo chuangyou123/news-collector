@@ -299,37 +299,33 @@ textarea {
   color: var(--text-muted);
 }
 
-.news-title {
-  font-size: 1.05rem;
-  font-weight: 600;
-  margin-bottom: 6px;
-  line-height: 1.4;
-}
-
-.news-title a {
+.news-content {
+  font-size: 0.95rem;
   color: var(--text);
-  text-decoration: none;
-  transition: color 0.2s;
+  line-height: 1.7;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 
-.news-title a:hover { color: var(--primary); }
-
-.news-summary {
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  line-height: 1.5;
+/* 置顶 */
+.news-card.pinned {
+  border-left-color: #F59E0B;
+  background: #FFFDF5;
 }
-
-.news-url {
-  display: inline-block;
-  margin-top: 8px;
-  font-size: 0.8rem;
-  color: var(--primary);
-  text-decoration: none;
-  word-break: break-all;
+.pin-badge {
+  font-size: 0.7rem;
+  color: #D97706;
+  background: #FEF3C7;
+  padding: 1px 8px;
+  border-radius: 10px;
+  margin-left: 6px;
+  vertical-align: middle;
 }
-
-.news-url:hover { text-decoration: underline; }
+.btn-pin { background: #FEF3C7; color: #D97706; }
+.btn-pin:hover { background: #FDE68A; }
+.btn-unpin { background: #F1F5F9; color: #64748B; }
+.btn-unpin:hover { background: #E2E8F0; }
+.admin-news-actions { display: flex; gap: 6px; align-items: center; }
 
 /* ===== 空状态 ===== */
 .empty-state {
@@ -631,6 +627,19 @@ textarea {
 .admin-user-count { font-size: 0.85rem; color: var(--text-muted); }
 .admin-user-date { font-size: 0.8rem; color: var(--text-muted); }
 .admin-user-actions { display: flex; gap: 6px; }
+
+.admin-user-role {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #E0E7FF;
+  color: #4F46E5;
+}
+.btn-promote { background: #E0E7FF; color: #4F46E5; }
+.btn-promote:hover { background: #C7D2FE; }
+.btn-demote { background: #F1F5F9; color: #64748B; }
+.btn-demote:hover { background: #E2E8F0; }
 
 /* ===== 改密弹窗 ===== */
 .modal-overlay {

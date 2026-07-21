@@ -17,9 +17,7 @@ const logoutBtn      = $('#logoutBtn');
 const adminBtn       = $('#adminBtn');
 const uploadCard     = $('#uploadCard');
 const newsForm       = $('#newsForm');
-const titleInput     = $('#titleInput');
-const urlInput       = $('#urlInput');
-const summaryInput   = $('#summaryInput');
+const contentInput   = $('#contentInput');
 const charCount      = $('#charCount');
 const newsList       = $('#newsList');
 const leaderboardList = $('#leaderboardList');
@@ -166,10 +164,11 @@ logoutBtn.addEventListener('click', async () => {
 // ── 检查管理员 IP（仅检查白名单，不验证密钥） ──
 async function checkAdminIP() {
   try {
-    const res = await fetch('/api/admin/check');
+    const res = await fetch('/api/admin/check', {
+      headers: authToken ? { 'Authorization': authToken } : {}
+    });
     const data = await res.json();
     adminIPOk = data.allowed;
-    // 仅 IP 通过时显示齿轮按钮；普通用户完全看不到
     if (adminIPOk) adminBtn.style.display = 'inline-block';
   } catch { adminIPOk = false; }
 }
@@ -177,16 +176,15 @@ async function checkAdminIP() {
 // ═══════════════════════════════════════════════════
 //  发布新闻
 // ═══════════════════════════════════════════════════
-summaryInput.addEventListener('input', () => {
-  charCount.textContent = `${summaryInput.value.length}/1000`;
+contentInput.addEventListener('input', () => {
+  charCount.textContent = `${contentInput.value.length}/500`;
 });
 
 newsForm.addEventListener('submit', async e => {
   e.preventDefault();
-  const title = titleInput.value.trim();
-  if (!title) { showToast('请输入新闻标题', 'error'); return; }
-  if ([...title].length < 5) { showToast('标题至少 5 个字符', 'error'); return; }
-  if ([...title].length > 50) { showToast('标题最多 50 个字符', 'error'); return; }
+  const content = contentInput.value.trim();
+  if ([...content].length < 5) { showToast('内容至少 5 个字符', 'error'); return; }
+  if ([...content].length > 500) { showToast('内容最多 500 个字符', 'error'); return; }
   if (!authToken) { showToast('请先登录', 'error'); return; }
 
   const btn = newsForm.querySelector('button');
@@ -195,7 +193,7 @@ newsForm.addEventListener('submit', async e => {
     const res = await fetch('/api/news', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': authToken },
-      body: JSON.stringify({ title, url: urlInput.value.trim(), summary: summaryInput.value.trim() })
+      body: JSON.stringify({ content })
     });
     if (!res.ok) {
       const err = await res.json();
@@ -203,10 +201,10 @@ newsForm.addEventListener('submit', async e => {
       if (res.status === 403) throw new Error(err.error || '账号已被封禁');
       throw new Error(err.error || '发布失败');
     }
-    titleInput.value = ''; urlInput.value = ''; summaryInput.value = ''; charCount.textContent = '0/1000';
-    showToast('✅ 新闻发布成功！', 'success');
+    contentInput.value = ''; charCount.textContent = '0/500';
+    showToast('✅ 发布成功！', 'success');
   } catch (err) { showToast(`❌ ${err.message}`, 'error'); }
-  finally { btn.disabled = false; btn.textContent = '🚀 发布新闻'; }
+  finally { btn.disabled = false; btn.textContent = '🚀 发布'; }
 });
 
 // ═══════════════════════════════════════════════════
@@ -221,7 +219,7 @@ socket.on('init-data', data => {
 socket.on('news-added', item => {
   prependNews(item);
   newsCount.textContent = document.querySelectorAll('.news-card').length;
-  addLog(item.username, '分享了新闻');
+  addLog(item.username, item.content.slice(0, 20) + (item.content.length > 20 ? '...' : ''));
 });
 
 socket.on('news-deleted', data => {
@@ -232,6 +230,16 @@ socket.on('news-deleted', data => {
 });
 
 socket.on('leaderboard-updated', lb => renderLeaderboard(lb));
+
+socket.on('news-pin-toggled', data => {
+  // 更新卡片置顶状态
+  const card = document.querySelector(`[data-id="${data.id}"]`);
+  if (card) {
+    if (data.pinned) { card.classList.add('pinned'); card.querySelector('.pin-badge').style.display = 'inline'; }
+    else { card.classList.remove('pinned'); card.querySelector('.pin-badge').style.display = 'none'; }
+  }
+  if (adminKey && adminOverlay.style.display !== 'none') loadAdminNews();
+});
 
 // ═══════════════════════════════════════════════════
 //  渲染函数
@@ -254,16 +262,12 @@ function newsCardHTML(item) {
   const initial = (item.username || '?')[0].toUpperCase();
   const color = getColor(item.username);
   const timeStr = formatTime(item.time);
-  const hasUrl = item.url && item.url.trim();
-  const hasSummary = item.summary && item.summary.trim();
-  return `<div class="news-card new-arrival" data-id="${item.id}">
+  return `<div class="news-card new-arrival ${item.pinned ? 'pinned' : ''}" data-id="${item.id}">
     <div class="news-header">
       <div class="news-avatar" style="background:${color}">${initial}</div>
-      <div class="news-meta"><div class="news-username">${esc(item.username)}</div><div class="news-time">${timeStr}</div></div>
+      <div class="news-meta"><div class="news-username">${esc(item.username)} <span class="pin-badge" style="display:${item.pinned ? 'inline' : 'none'}">📌置顶</span></div><div class="news-time">${timeStr}</div></div>
     </div>
-    <div class="news-title">${hasUrl ? `<a href="${escAttr(item.url)}" target="_blank" rel="noopener">${esc(item.title)} 🔗</a>` : esc(item.title)}</div>
-    ${hasSummary ? `<div class="news-summary">${esc(item.summary)}</div>` : ''}
-    ${hasUrl ? `<a class="news-url" href="${escAttr(item.url)}" target="_blank" rel="noopener">${esc(item.url)}</a>` : ''}
+    <div class="news-content">${esc(item.content)}</div>
   </div>`;
 }
 function renderLeaderboard(lb) {
@@ -304,7 +308,7 @@ async function doVerifyAdminKey() {
   adminKeyConfirm.disabled = true; adminKeyConfirm.textContent = '⏳';
   try {
     const res = await fetch('/api/admin/auth', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': authToken || '' },
       body: JSON.stringify({ key })
     });
     if (!res.ok) { const e = await res.json(); throw new Error(e.error || '密钥错误'); }
@@ -345,7 +349,7 @@ adminDateFilter.addEventListener('change', loadAdminNews);
 
 // ── 管理 API（均携带 x-admin-key） ────────────────
 function adminHeaders() {
-  return { 'x-admin-key': adminKey || '' };
+  return { 'x-admin-key': adminKey || '', 'x-user-token': authToken || '' };
 }
 
 async function loadAdminNews() {
@@ -361,15 +365,32 @@ async function loadAdminNews() {
         <div class="admin-news-item">
           <div class="admin-news-info">
             <span class="admin-news-user">${esc(item.username)}</span>
-            <span class="admin-news-title">${esc(item.title)}</span>
+            <span class="admin-news-title">${esc(item.content.slice(0, 50))}${item.content.length > 50 ? '...' : ''}</span>
             <span class="admin-news-time">${formatTime(item.time)}</span>
           </div>
-          <button class="btn-del" onclick="deleteNews('${item.id}')" title="删除此新闻">🗑</button>
+          <div class="admin-news-actions">
+            <button class="btn-sm ${item.pinned ? 'btn-unpin' : 'btn-pin'}" onclick="togglePin('${item.id}', ${!item.pinned})">${item.pinned ? '📌已置顶' : '📌置顶'}</button>
+            <button class="btn-del" onclick="deleteNews('${item.id}')" title="删除此新闻">🗑</button>
+          </div>
         </div>
       `).join('');
     }
   } catch (err) { adminNewsList.innerHTML = `<div class="empty-state small"><p>加载失败: ${esc(err.message)}</p></div>`; }
 }
+
+// ── 置顶/取消置顶 ────────────────────────────────
+window.togglePin = async function(id, pin) {
+  try {
+    const res = await fetch('/api/admin/pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...adminHeaders() },
+      body: JSON.stringify({ id, pinned: pin })
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+    showToast(pin ? '📌 已置顶' : '已取消置顶', 'success');
+    loadAdminNews();
+  } catch (err) { showToast(`❌ ${err.message}`, 'error'); }
+};
 
 window.deleteNews = async function(id) {
   if (!confirm('确定要删除这条新闻吗？')) return;
@@ -387,9 +408,9 @@ adminCopyToday.addEventListener('click', async () => {
     const res = await fetch(`/api/admin/news?date=${date}`, { headers: adminHeaders() });
     const list = await res.json();
     if (list.length === 0) { showToast('当天没有新闻', 'info'); return; }
-    const text = list.map(item => item.title).join(', ');
+    const text = list.map(item => item.content).join('\n---\n');
     await navigator.clipboard.writeText(text);
-    showToast(`📋 已复制 ${list.length} 条新闻标题`, 'success');
+    showToast(`📋 已复制 ${list.length} 条新闻`, 'success');
   } catch (err) { showToast('复制失败，请手动选择', 'error'); }
 });
 
@@ -405,12 +426,14 @@ async function loadAdminUsers() {
     adminUserList.innerHTML = list.map(u => `
       <div class="admin-user-item ${u.banned ? 'banned' : ''}">
         <div class="admin-user-info">
-          <span class="admin-user-name">${esc(u.username)}${u.banned ? ' 🚫' : ''}</span>
+          <span class="admin-user-name">${esc(u.username)}${u.banned ? ' 🚫' : ''}${u.role==='superadmin'?' 👑':u.role==='admin'?' 🔧':''}</span>
           <span class="admin-user-ip">IP: ${esc(u.ip)}</span>
           <span class="admin-user-count">📰 ${u.count} 条</span>
+          <span class="admin-user-role">${u.role==='superadmin'?'超级管理员':u.role==='admin'?'管理员':'用户'}</span>
           <span class="admin-user-date">注册: ${u.createdAt ? u.createdAt.slice(0,10) : '?'}</span>
         </div>
         <div class="admin-user-actions">
+          ${u.role !== 'superadmin' ? `<button class="btn-sm ${u.role==='admin' ? 'btn-demote' : 'btn-promote'}" onclick="toggleRole('${esc(u.username)}', '${u.role==='admin'?'user':'admin'}')">${u.role==='admin'?'⬇ 撤销':'⬆ 设为管理员'}</button>` : ''}
           <button class="btn-sm ${u.banned ? 'btn-unban' : 'btn-ban'}" onclick="toggleBan('${esc(u.username)}', ${!u.banned})">${u.banned ? '✅ 解封' : '🚫 封禁'}</button>
           <button class="btn-sm btn-pwd" onclick="openPwdModal('${esc(u.username)}')">🔑 改密</button>
         </div>
@@ -427,6 +450,22 @@ window.toggleBan = async function(username, ban) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...adminHeaders() },
       body: JSON.stringify({ username, banned: ban })
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+    showToast(`${action}成功`, 'success');
+    loadAdminUsers();
+  } catch (err) { showToast(`❌ ${err.message}`, 'error'); }
+};
+
+// ── 赋予/撤销管理员 ──────────────────────────────
+window.toggleRole = async function(username, role) {
+  const action = role === 'admin' ? '设为管理员' : '撤销管理员';
+  if (!confirm(`确定要${action}「${username}」吗？（需要超级管理员权限）`)) return;
+  try {
+    const res = await fetch('/api/admin/set-role', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...adminHeaders(), 'x-user-token': authToken },
+      body: JSON.stringify({ username, role })
     });
     if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
     showToast(`${action}成功`, 'success');

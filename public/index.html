@@ -36,14 +36,10 @@
       <div class="upload-card" id="uploadCard" style="display:none;">
         <h3>📝 分享新闻</h3>
         <form id="newsForm" autocomplete="off">
-          <div class="form-row">
-            <input type="text" id="titleInput" placeholder="新闻标题（5-50字）*" maxlength="50" required>
-            <input type="url" id="urlInput" placeholder="链接（可选）" maxlength="500">
-          </div>
-          <textarea id="summaryInput" placeholder="摘要或评论（可选）" maxlength="1000" rows="2"></textarea>
+          <textarea id="contentInput" placeholder="写点什么...（5-500字）" maxlength="500" rows="3"></textarea>
           <div class="form-actions">
-            <span class="char-count" id="charCount">0/1000</span>
-            <button type="submit" class="btn-primary">🚀 发布新闻</button>
+            <span class="char-count" id="charCount">0/500</span>
+            <button type="submit" class="btn-primary">🚀 发布</button>
           </div>
         </form>
       </div>
