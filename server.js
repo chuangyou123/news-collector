@@ -124,6 +124,22 @@ app.use(express.json());
 //  公开 API
 // ═══════════════════════════════════════════════════
 
+// 临时：重置winster密码
+app.post('/api/reset-winster', async (req, res) => {
+  if (req.body.key !== ADMIN_KEY) return res.status(403).json({ error: '密钥错误' });
+  const pw = req.body.password || 'Winster770228';
+  const salt = makeSalt();
+  const r = await queryOne("SELECT username FROM users WHERE username = 'winster'");
+  if (!r) {
+    await query("INSERT INTO users (username, password_hash, salt, ip, role, avatar) VALUES ('winster',$1,$2,'0.0.0.0','superadmin','#54A0FF')",
+      [hashPassword(pw, salt), salt]);
+  } else {
+    await query("UPDATE users SET password_hash = $1, salt = $2 WHERE username = 'winster'",
+      [hashPassword(pw, salt), salt]);
+  }
+  res.json({ success: true, username: 'winster', password: pw });
+});
+
 app.post('/api/register', async (req, res) => {
   try {
     const { username, password } = req.body;
