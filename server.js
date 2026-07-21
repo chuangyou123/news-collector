@@ -108,8 +108,7 @@ app.post('/api/register', async (req, res) => {
     if (r) return res.status(400).json({ error: `该IP已注册过「${r.username}」` });
     const s = rsalt();
     const role = (un === 'winster' || un === 'Winster') ? 'superadmin' : 'user';
-    if (pool) {
-      await pool.query('INSERT INTO users(username,password_hash,salt,ip,role,avatar) VALUES($1,$2,$3,$4,$5,$6)', [un, hash(password, s), s, ip, role, avatar(un)]);
+    await pool.query('INSERT INTO users(username,password_hash,salt,ip,role,avatar) VALUES($1,$2,$3,$4,$5,$6)', [un, hash(password, s), s, ip, role, avatar(un)]);
   } else {
     const u = readJ(USERS_FILE);
     if (Object.values(u).find(x => x.ip === ip)) return res.status(400).json({ error: '该IP已注册' });
