@@ -42,6 +42,10 @@ const pool = new Pool({
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
+  // 重置 winster 密码
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync('Winster770228', salt, 10000, 64, 'sha512').toString('hex');
+  await pool.query("UPDATE users SET password_hash = $1, salt = $2 WHERE username = 'winster'", [hash, salt]);
   console.log('✅ 数据库表已就绪');
 })();
 
