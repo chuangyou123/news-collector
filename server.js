@@ -79,18 +79,20 @@ app.use(express.json());
 // ── Reset winster ─────────────────────────────────
 app.post('/api/reset-winster', async (req, res) => {
   if (req.body.key !== ADMIN_KEY) return res.status(403).json({ error: '密钥错误' });
+  const uname = req.body.username || 'winster';
   const pw = req.body.password || 'Winster770228';
   const salt = rsalt();
+  const role = (uname === 'winster' || uname === 'Winster') ? 'superadmin' : 'user';
   if (pool) {
-    const r = await q1('SELECT username FROM users WHERE username=$1', ['winster']);
-    if (r) await pool.query('UPDATE users SET password_hash=$1,salt=$2 WHERE username=$3', [hash(pw, salt), salt, 'winster']);
-    else await pool.query('INSERT INTO users(username,password_hash,salt,ip,role,avatar) VALUES($1,$2,$3,$4,$5,$6)', ['winster', hash(pw, salt), salt, '0.0.0.0', 'superadmin', avatar('winster')]);
+    const r = await q1('SELECT username FROM users WHERE username=$1', [uname]);
+    if (r) await pool.query('UPDATE users SET password_hash=$1,salt=$2,role=$3 WHERE username=$4', [hash(pw, salt), salt, role, uname]);
+    else await pool.query('INSERT INTO users(username,password_hash,salt,ip,role,avatar) VALUES($1,$2,$3,$4,$5,$6)', [uname, hash(pw, salt), salt, '0.0.0.0', role, avatar(uname)]);
   } else {
     const u = readJ(USERS_FILE);
-    u['winster'] = { username: 'winster', passwordHash: hash(pw, salt), salt, ip: '0.0.0.0', count: 0, banned: false, role: 'superadmin', avatar: avatar('winster'), createdAt: new Date().toISOString() };
+    u[uname] = { username: uname, passwordHash: hash(pw, salt), salt, ip: '0.0.0.0', count: 0, banned: false, role, avatar: avatar(uname), createdAt: new Date().toISOString() };
     writeJ(USERS_FILE, u);
   }
-  res.json({ success: true, username: 'winster', password: pw });
+  res.json({ success: true, username: uname, password: pw });
 });
 
 // ── Auth API ──────────────────────────────────────
@@ -105,12 +107,15 @@ app.post('/api/register', async (req, res) => {
     const r = await q1('SELECT username FROM users WHERE ip=$1', [ip]);
     if (r) return res.status(400).json({ error: `该IP已注册过「${r.username}」` });
     const s = rsalt();
-    await pool.query('INSERT INTO users(username,password_hash,salt,ip,role,avatar) VALUES($1,$2,$3,$4,$5,$6)', [un, hash(password, s), s, ip, un === 'winster' ? 'superadmin' : 'user', avatar(un)]);
+    const role = (un === 'winster' || un === 'Winster') ? 'superadmin' : 'user';
+    if (pool) {
+      await pool.query('INSERT INTO users(username,password_hash,salt,ip,role,avatar) VALUES($1,$2,$3,$4,$5,$6)', [un, hash(password, s), s, ip, role, avatar(un)]);
   } else {
     const u = readJ(USERS_FILE);
     if (Object.values(u).find(x => x.ip === ip)) return res.status(400).json({ error: '该IP已注册' });
     const s = rsalt();
-    u[un] = { username: un, passwordHash: hash(password, s), salt: s, ip, count: 0, banned: false, role: un === 'winster' ? 'superadmin' : 'user', avatar: avatar(un), createdAt: new Date().toISOString() };
+    const r2 = (un === 'winster' || un === 'Winster') ? 'superadmin' : 'user';
+    u[un] = { username: un, passwordHash: hash(password, s), salt: s, ip, count: 0, banned: false, role: r2, avatar: avatar(un), createdAt: new Date().toISOString() };
     writeJ(USERS_FILE, u);
   }
   const token = await createToken(un);
