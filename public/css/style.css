@@ -343,6 +343,59 @@ textarea {
 .btn-pin { background: #FEF3C7; color: #D97706; }
 .btn-pin:hover { background: #FDE68A; }
 .btn-unpin { background: #F1F5F9; color: #64748B; }
+
+/* ═══ 主Tab导航 ═══ */
+.main-tabs {
+  max-width: 1200px; margin: 16px auto 0; padding: 0 24px;
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+}
+.main-tab {
+  padding: 10px 22px; border: none; background: var(--card-bg);
+  border-radius: 10px 10px 0 0; cursor: pointer; font-size: 0.95rem;
+  font-weight: 500; color: var(--text-muted); transition: all 0.2s;
+  box-shadow: var(--shadow);
+}
+.main-tab:hover { color: var(--text); }
+.main-tab.active { background: var(--primary); color: #fff; font-weight: 600; }
+.total-count {
+  margin-left: auto; font-size: 0.85rem; color: var(--text-muted);
+  background: var(--card-bg); padding: 8px 16px; border-radius: 20px;
+  box-shadow: var(--shadow);
+}
+.total-count strong { color: var(--primary); font-size: 1.1rem; }
+
+/* ═══ 新闻库 ═══ */
+.library-toolbar {
+  display: flex; gap: 12px; margin-bottom: 16px; align-items: center;
+}
+.input-search {
+  flex: 1; padding: 10px 14px; border: 2px solid var(--border);
+  border-radius: 8px; font-size: 0.9rem; outline: none;
+}
+.input-search:focus { border-color: var(--primary-light); }
+.library-list { max-height: 70vh; overflow-y: auto; }
+.lib-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.lib-item:hover { background: #F8FAFC; }
+.lib-num {
+  color: var(--text-muted); font-size: 0.8rem; font-weight: 600;
+  min-width: 36px; text-align: right; padding-top: 2px;
+}
+.lib-user {
+  color: var(--primary); font-size: 0.8rem; font-weight: 600;
+  white-space: nowrap; min-width: 60px; padding-top: 2px;
+}
+.lib-text { flex: 1; font-size: 0.9rem; line-height: 1.5; }
+.lib-del {
+  background: none; border: none; color: #EF4444; cursor: pointer;
+  font-size: 0.85rem; padding: 2px 6px; border-radius: 4px;
+  opacity: 0; transition: opacity 0.15s;
+}
+.lib-item:hover .lib-del { opacity: 1; }
+.lib-del:hover { background: #FEE2E2; }
 .btn-unpin:hover { background: #E2E8F0; }
 .admin-news-actions { display: flex; gap: 6px; align-items: center; }
 

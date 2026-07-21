@@ -16,6 +16,7 @@ const DATA_DIR = path.join(__dirname, 'data');
 const NEWS_FILE = path.join(DATA_DIR, 'news.json');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const TOKENS_FILE = path.join(DATA_DIR, 'tokens.json');
+const SEED_FILE = path.join(DATA_DIR, 'seed-news.json');
 
 function initFile(fp, def) { if (!fs.existsSync(fp)) fs.writeFileSync(fp, JSON.stringify(def, null, 2)); }
 initFile(NEWS_FILE, []);
@@ -24,6 +25,21 @@ initFile(TOKENS_FILE, {});
 
 function readJSON(fp) { try { return JSON.parse(fs.readFileSync(fp, 'utf-8')); } catch { return fp === NEWS_FILE ? [] : {}; } }
 function writeJSON(fp, d) { fs.writeFileSync(fp, JSON.stringify(d, null, 2)); }
+
+// 加载示例新闻
+let seedNews = [];
+try {
+  seedNews = JSON.parse(fs.readFileSync(SEED_FILE, 'utf-8'));
+  seedNews = seedNews.map((text, i) => ({
+    id: 'seed-' + i,
+    username: '📢 示例',
+    content: sanitize(text),
+    pinned: false,
+    time: '2025-01-01T00:00:00.000Z',
+    seed: true
+  }));
+  console.log(`📦 加载了 ${seedNews.length} 条示例新闻`);
+} catch { seedNews = []; }
 
 function sanitize(str) {
   if (!str || typeof str !== 'string') return '';
@@ -98,7 +114,25 @@ app.post('/api/login', (req, res) => {
 app.post('/api/logout', (req, res) => { const t = req.headers['authorization'] || req.query.token; if (t) removeToken(t); res.json({ success: true }); });
 app.get('/api/me', (req, res) => { const t = req.headers['authorization'] || req.query.token; const u = verifyToken(t); if (!u) return res.status(401).json({ error: '未登录' }); res.json({ username: u }); });
 
-app.get('/api/news', (req, res) => { const n = readJSON(NEWS_FILE); res.json([...n.filter(x => x.pinned), ...n.filter(x => !x.pinned)]); });
+app.get('/api/news', (req, res) => {
+  const n = readJSON(NEWS_FILE);
+  const userNews = [...n.filter(x => x.pinned), ...n.filter(x => !x.pinned)];
+  res.json([...userNews, ...seedNews]);
+});
+
+// 下载全部新闻（纯文本，每条一行）
+app.get('/api/news/download', (req, res) => {
+  const n = readJSON(NEWS_FILE);
+  const all = [...n.map(x => x.content), ...seedNews.map(x => x.content)];
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.send(all.join('\n---\n'));
+});
+
+// 新闻总数
+app.get('/api/news/count', (req, res) => {
+  const n = readJSON(NEWS_FILE);
+  res.json({ count: n.length + seedNews.length, userCount: n.length, seedCount: seedNews.length });
+});
 
 app.post('/api/news', authMiddleware, (req, res) => {
   let { content } = req.body;
@@ -138,6 +172,7 @@ app.get('/api/admin/news', adminMiddleware, (req, res) => { const d = req.query.
 
 app.delete('/api/admin/news/:id', adminMiddleware, (req, res) => {
   const { id } = req.params;
+  if (id.startsWith('seed-')) return res.status(403).json({ error: '示例新闻不可删除' });
   let news = readJSON(NEWS_FILE);
   const item = news.find(n => n.id === id);
   if (!item) return res.status(404).json({ error: '不存在' });
@@ -215,7 +250,9 @@ app.post('/api/admin/reset-password', adminMiddleware, (req, res) => {
 });
 
 io.on('connection', socket => {
-  socket.emit('init-data', { news: readJSON(NEWS_FILE), leaderboard: getLeaderboard() });
+  const n = readJSON(NEWS_FILE);
+  const userNews = [...n.filter(x => x.pinned), ...n.filter(x => !x.pinned)];
+  socket.emit('init-data', { news: [...userNews, ...seedNews], leaderboard: getLeaderboard() });
   socket.on('disconnect', () => {});
 });
 

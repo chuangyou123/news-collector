@@ -4,23 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>📰 新闻收集站</title>
-  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <!-- 顶部导航 -->
   <header>
     <div class="header-inner">
       <h1>📰 新闻收集站</h1>
-
-      <!-- 未登录 -->
       <div class="user-area" id="userArea">
         <input type="text" id="usernameInput" placeholder="昵称" maxlength="20" autocomplete="username">
         <input type="password" id="passwordInput" placeholder="密码" maxlength="50" autocomplete="current-password">
         <button id="loginBtn" class="btn-primary-sm">登录</button>
         <button id="switchToRegisterBtn" class="btn-outline-sm">注册</button>
       </div>
-
-      <!-- 已登录 -->
       <div class="user-info" id="userInfo" style="display:none;">
         <span class="user-badge" id="userBadge"></span>
         <button id="adminBtn" class="btn-admin" style="display:none;" title="管理面板">⚙️</button>
@@ -29,10 +24,17 @@
     </div>
   </header>
 
-  <!-- 主布局 -->
+  <!-- 主 Tab 导航 -->
+  <nav class="main-tabs">
+    <button class="main-tab active" data-tab="publish">📝 发布新闻</button>
+    <button class="main-tab" data-tab="library">📚 新闻库</button>
+    <button class="main-tab" data-tab="rank">🏆 排行榜</button>
+    <span class="total-count">本站已收录 <strong id="totalCount">0</strong> 条新闻</span>
+  </nav>
+
   <div class="main-container">
-    <!-- 左侧：新闻区 -->
-    <div class="news-section">
+    <!-- Tab: 发布新闻 -->
+    <div class="tab-content" id="tabPublish">
       <div class="upload-card" id="uploadCard" style="display:none;">
         <h3>📝 分享新闻</h3>
         <form id="newsForm" autocomplete="off">
@@ -43,99 +45,50 @@
           </div>
         </form>
       </div>
-
-      <div class="stats-bar">
-        <span>📋 共 <strong id="newsCount">0</strong> 条新闻</span>
-        <span>🟢 在线 <strong id="onlineCount">-</strong></span>
-      </div>
-
       <div class="news-list" id="newsList">
-        <div class="empty-state">
-          <div class="empty-icon">📭</div>
-          <p>还没有新闻，快来分享第一条吧！</p>
-        </div>
+        <div class="empty-state"><div class="empty-icon">📭</div><p>还没有新闻</p></div>
       </div>
     </div>
 
-    <!-- 右侧 -->
-    <aside class="leaderboard-section">
+    <!-- Tab: 新闻库 -->
+    <div class="tab-content" id="tabLibrary" style="display:none;">
+      <div class="library-toolbar">
+        <button id="downloadBtn" class="btn-primary">📥 下载全部新闻</button>
+        <input type="text" id="searchInput" placeholder="🔍 搜索新闻..." class="input-search">
+      </div>
+      <div class="library-list" id="libraryList">
+        <div class="empty-state"><p>加载中...</p></div>
+      </div>
+    </div>
+
+    <!-- Tab: 排行榜 -->
+    <div class="tab-content" id="tabRank" style="display:none;">
       <div class="leaderboard-card">
         <h3>🏆 上传排行榜</h3>
         <div class="leaderboard-list" id="leaderboardList">
-          <div class="empty-state small"><p>暂无排名数据</p></div>
+          <div class="empty-state small"><p>暂无排名</p></div>
         </div>
       </div>
-      <div class="live-log" id="liveLog">
-        <h4>📡 实时动态</h4>
-        <div class="log-list" id="logList"></div>
-      </div>
-    </aside>
+    </div>
   </div>
 
-  <!-- ═══ 管理员密钥弹窗（面板打开前必须验证） ═══ -->
+  <!-- 管理员密钥弹窗 -->
   <div class="modal-overlay" id="adminKeyOverlay" style="display:none;">
-    <div class="modal-box">
-      <h3>🔐 管理员验证</h3>
-      <p class="modal-target">请输入管理员密钥以继续</p>
-      <input type="password" id="adminKeyInput" placeholder="输入或粘贴管理员密钥" maxlength="300" autocomplete="off">
-      <div class="modal-actions">
-        <button id="adminKeyCancel" class="btn-outline">取消</button>
-        <button id="adminKeyConfirm" class="btn-primary">验证</button>
-      </div>
-    </div>
+    <div class="modal-box"><h3>🔐 管理员验证</h3><p class="modal-target">请输入管理员密钥</p><input type="password" id="adminKeyInput" placeholder="粘贴密钥" maxlength="300"><div class="modal-actions"><button id="adminKeyCancel" class="btn-outline">取消</button><button id="adminKeyConfirm" class="btn-primary">验证</button></div></div>
   </div>
 
-  <!-- ═══ 管理员面板（弹窗） ═══ -->
+  <!-- 管理员面板 -->
   <div class="admin-overlay" id="adminOverlay" style="display:none;">
-    <div class="admin-panel">
-      <div class="admin-panel-header">
-        <h2>⚙️ 管理面板</h2>
-        <button id="adminCloseBtn" class="btn-close">✕</button>
-      </div>
-
-      <!-- Tab 切换 -->
-      <div class="admin-tabs">
-        <button class="admin-tab active" data-tab="news">📰 每日新闻</button>
-        <button class="admin-tab" data-tab="users">👥 用户管理</button>
-      </div>
-
-      <!-- Tab: 每日新闻 -->
-      <div class="admin-tab-content" id="tabNews">
-        <div class="admin-toolbar">
-          <input type="date" id="adminDateFilter" class="input-date">
-          <button id="adminCopyToday" class="btn-sm btn-copy">📋 复制当天新闻</button>
-        </div>
-        <div class="admin-news-list" id="adminNewsList">
-          <div class="empty-state small"><p>该日期暂无新闻</p></div>
-        </div>
-      </div>
-
-      <!-- Tab: 用户管理 -->
-      <div class="admin-tab-content" id="tabUsers" style="display:none;">
-        <div class="admin-user-list" id="adminUserList">
-          <div class="empty-state small"><p>暂无用户</p></div>
-        </div>
-      </div>
-    </div>
+    <div class="admin-panel"><div class="admin-panel-header"><h2>⚙️ 管理面板</h2><button id="adminCloseBtn" class="btn-close">✕</button></div><div class="admin-tabs"><button class="admin-tab active" data-tab="news">📰 每日新闻</button><button class="admin-tab" data-tab="users">👥 用户管理</button></div><div class="admin-tab-content" id="tabNews"><div class="admin-toolbar"><input type="date" id="adminDateFilter" class="input-date"><button id="adminCopyToday" class="btn-sm btn-copy">📋 复制当天</button></div><div class="admin-news-list" id="adminNewsList"></div></div><div class="admin-tab-content" id="tabUsers" style="display:none;"><div class="admin-user-list" id="adminUserList"></div></div></div>
   </div>
 
-  <!-- 改密弹窗 -->
   <div class="modal-overlay" id="pwdModalOverlay" style="display:none;">
-    <div class="modal-box">
-      <h3>🔑 修改密码</h3>
-      <p class="modal-target" id="pwdModalTarget"></p>
-      <input type="password" id="pwdModalInput" placeholder="输入新密码（至少4位）" maxlength="50">
-      <div class="modal-actions">
-        <button id="pwdModalCancel" class="btn-outline">取消</button>
-        <button id="pwdModalConfirm" class="btn-primary">确认修改</button>
-      </div>
-    </div>
+    <div class="modal-box"><h3>🔑 修改密码</h3><p class="modal-target" id="pwdModalTarget"></p><input type="password" id="pwdModalInput" placeholder="新密码（至少4位）" maxlength="50"><div class="modal-actions"><button id="pwdModalCancel" class="btn-outline">取消</button><button id="pwdModalConfirm" class="btn-primary">确认</button></div></div>
   </div>
 
-  <!-- Toast -->
   <div class="toast-container" id="toastContainer"></div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/js/app.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>
