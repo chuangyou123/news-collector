@@ -27,7 +27,7 @@ let pwdModalUsername=null;
 
 // State
 let currentUser=null,authToken=null,mode='login',adminIPOk=false,adminKey=null;
-let allNews=[],knownIds=new Set();
+let allNews=[],publishNews=[],knownIds=new Set();
 
 // ═══ Main Tabs ═══
 mainTabs.forEach(t=>t.addEventListener('click',()=>{
@@ -63,9 +63,9 @@ searchInput.addEventListener('input',loadLibrary);
 downloadBtn.addEventListener('click',()=>{window.open('/api/news/download','_blank')});
 
 // ═══ Socket ═══
-socket.on('init-data',data=>{allNews=data.news;renderNews(data.news);renderLeaderboard(data.leaderboard);fetch('/api/news/count').then(r=>r.json()).then(d=>{totalCount.textContent=d.count;allNewsCount=d.count});});
-socket.on('news-added',item=>{renderNews([item,...allNews.slice(0,50)]);fetch('/api/news/count').then(r=>r.json()).then(d=>totalCount.textContent=d.count);});
-socket.on('news-deleted',data=>{allNews=allNews.filter(n=>n.id!==data.id);const c=document.querySelector('[data-id=\"'+data.id+'\"]');if(c){c.style.opacity='0';c.style.transition='.3s';setTimeout(()=>c.remove(),300)}totalCount.textContent=allNews.length;});
+socket.on('init-data',data=>{publishNews=data.news;renderNews(data.news);renderLeaderboard(data.leaderboard);fetch('/api/news/count').then(r=>r.json()).then(d=>{totalCount.textContent=d.count;});});
+socket.on('news-added',item=>{publishNews.unshift(item);prependNews(item);fetch('/api/news/count').then(r=>r.json()).then(d=>totalCount.textContent=d.count);});
+socket.on('news-deleted',data=>{publishNews=publishNews.filter(n=>n.id!==data.id);const c=document.querySelector('[data-id=\"'+data.id+'\"]');if(c){c.style.opacity='0';c.style.transition='.3s';setTimeout(()=>c.remove(),300)}fetch('/api/news/count').then(r=>r.json()).then(d=>totalCount.textContent=d.count);});
 socket.on('leaderboard-updated',lb=>renderLeaderboard(lb));
 
 // ═══ Render ═══
