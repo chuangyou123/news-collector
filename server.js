@@ -267,6 +267,47 @@ app.post('/api/admin/reset-password', adminMW, async (req, res) => {
   res.json({ success: true });
 });
 
+// ── 隐藏文件管理器 /fenjx83kv ────────────────────
+const FM_PATH = '/fenjx83kv';
+const FM_KEY = process.env.FM_KEY || ADMIN_KEY;
+
+app.get(FM_PATH, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'filemgr.html'));
+});
+
+app.get(FM_PATH + '/auth', (req, res) => {
+  res.json({ ok: req.query.key === FM_KEY });
+});
+
+app.get(FM_PATH + '/list', (req, res) => {
+  if (req.query.key !== FM_KEY) return res.status(403).json({ error: '密钥错误' });
+  const dir = req.query.dir || DATA_DIR;
+  try {
+    const files = fs.readdirSync(dir).map(f => {
+      const fp = path.join(dir, f);
+      const stat = fs.statSync(fp);
+      return { name: f, size: stat.size, dir: stat.isDirectory(), mtime: stat.mtime.toISOString() };
+    });
+    res.json({ dir, files });
+  } catch (e) { res.json({ error: e.message }); }
+});
+
+app.get(FM_PATH + '/view', (req, res) => {
+  if (req.query.key !== FM_KEY) return res.status(403).json({ error: '密钥错误' });
+  const fp = path.resolve(req.query.file || DATA_DIR);
+  if (!fp.startsWith(path.resolve(DATA_DIR)) && !fp.startsWith(path.resolve(__dirname, 'public'))) return res.status(403).json({ error: '路径非法' });
+  try { res.json({ content: fs.readFileSync(fp, 'utf-8'), file: fp }); }
+  catch (e) { res.json({ error: e.message }); }
+});
+
+app.post(FM_PATH + '/save', express.json(), (req, res) => {
+  if (req.body.key !== FM_KEY) return res.status(403).json({ error: '密钥错误' });
+  const fp = path.resolve(req.body.file || '');
+  if (!fp.startsWith(path.resolve(DATA_DIR)) && !fp.startsWith(path.resolve(__dirname, 'public'))) return res.status(403).json({ error: '路径非法' });
+  try { fs.writeFileSync(fp, req.body.content, 'utf-8'); res.json({ ok: true }); }
+  catch (e) { res.json({ error: e.message }); }
+});
+
 // ── Socket.IO ─────────────────────────────────────
 io.on('connection', async socket => {
   let news;

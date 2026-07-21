@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>文件管理器</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:monospace;background:#1a1a2e;color:#e0e0e0;padding:16px}
+h2{color:#54A0FF;margin-bottom:12px}
+input,textarea,button{font-family:monospace;padding:8px 12px;border:none;border-radius:6px;font-size:0.9rem}
+input{background:#16213e;color:#e0e0e0;border:1px solid #333;width:300px}
+button{cursor:pointer;background:#54A0FF;color:#fff;margin-left:6px}
+button.danger{background:#EF4444}
+button.small{padding:4px 8px;font-size:0.75rem}
+.file-list{margin:12px 0;max-height:60vh;overflow-y:auto}
+.file-item{display:flex;align-items:center;padding:6px 10px;border-bottom:1px solid #222;gap:12px}
+.file-item:hover{background:#16213e}
+.file-name{flex:1;cursor:pointer;color:#54A0FF}
+.file-name:hover{text-decoration:underline}
+.file-size{color:#888;font-size:0.8rem;min-width:80px}
+.file-mtime{color:#666;font-size:0.75rem}
+.dir{color:#F59E0B}
+#editor{width:100%;height:50vh;background:#0f0f1a;color:#e0e0e0;border:1px solid #333;border-radius:6px;padding:12px;font-size:0.85rem;resize:vertical;display:none}
+#status{color:#10B981;margin:8px 0;font-size:0.85rem}
+.breadcrumb{margin:8px 0;font-size:0.85rem}
+.breadcrumb span{cursor:pointer;color:#54A0FF}
+.breadcrumb span:hover{text-decoration:underline}
+</style></head>
+<body>
+<h2>📁 文件管理器</h2>
+<div>
+  <input id="keyInput" type="password" placeholder="输入管理密钥">
+  <button onclick="auth()">验证</button>
+</div>
+<div id="main" style="display:none">
+  <div class="breadcrumb" id="breadcrumb"></div>
+  <div class="file-list" id="fileList"></div>
+  <textarea id="editor" placeholder="文件内容..."></textarea>
+  <div style="margin-top:8px;display:none" id="editorBtns">
+    <button onclick="saveFile()">💾 保存</button>
+    <button class="danger" onclick="closeEditor()">✕ 关闭</button>
+  </div>
+  <div id="status"></div>
+</div>
+<script>
+let key='',curDir='',curFile='';
+async function auth(){key=document.getElementById('keyInput').value;const r=await fetch('/fenjx83kv/auth?key='+key);if((await r.json()).ok){document.getElementById('main').style.display='block';loadDir('')}else{alert('密钥错误')}}
+async function loadDir(dir){curDir=dir||'';curFile='';document.getElementById('editor').style.display='none';document.getElementById('editorBtns').style.display='none';const r=await fetch('/fenjx83kv/list?key='+key+'&dir='+(dir||''));const d=await r.json();if(d.error){document.getElementById('fileList').innerHTML='<p>'+d.error+'</p>';return}
+document.getElementById('breadcrumb').innerHTML='<span onclick="loadDir(\'\')">📂 /</span> '+(dir?dir.split('/').map((p,i,a)=>' / <span onclick="loadDir(\''+a.slice(0,i+1).join('/')+'\')">'+p+'</span>').join(''):'');
+document.getElementById('fileList').innerHTML=d.files.sort((a,b)=>b.dir-a.dir||a.name.localeCompare(b.name)).map(f=>`<div class="file-item"><span class="file-name ${f.dir?'dir':''}" onclick="${f.dir?'loadDir(\''+(dir?dir+'/':'')+f.name+'\')':'viewFile(\''+(dir?dir+'/':'')+f.name+'\')'}">${f.dir?'📁':'📄'} ${f.name}</span><span class="file-size">${f.dir?'':fmtSize(f.size)}</span><span class="file-mtime">${f.mtime.slice(0,16)}</span>${f.dir?'':`<button class="small danger" onclick="delFile('${(dir?dir+'/':'')+f.name}')">🗑</button>`}</div>`).join('');}
+async function viewFile(f){curFile=f;const r=await fetch('/fenjx83kv/view?key='+key+'&file='+f);const d=await r.json();document.getElementById('editor').value=d.content||'';document.getElementById('editor').style.display='block';document.getElementById('editorBtns').style.display='block';document.getElementById('status').textContent='📄 '+f}
+async function saveFile(){const r=await fetch('/fenjx83kv/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,file:curFile,content:document.getElementById('editor').value})});const d=await r.json();document.getElementById('status').textContent=d.ok?'✅ 已保存':'❌ '+(d.error||'失败')}
+function closeEditor(){curFile='';document.getElementById('editor').style.display='none';document.getElementById('editorBtns').style.display='none'}
+async function delFile(f){if(!confirm('删除 '+f+'?'))return;const r=await fetch('/fenjx83kv/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,file:f,content:''})});await r.json();loadDir(curDir)}
+function fmtSize(s){if(s<1024)return s+'B';if(s<1048576)return (s/1024).toFixed(1)+'KB';return (s/1048576).toFixed(1)+'MB'}
+</script>
+</body>
+</html>
