@@ -114,7 +114,14 @@ app.post('/api/login', (req, res) => {
 app.post('/api/logout', (req, res) => { const t = req.headers['authorization'] || req.query.token; if (t) removeToken(t); res.json({ success: true }); });
 app.get('/api/me', (req, res) => { const t = req.headers['authorization'] || req.query.token; const u = verifyToken(t); if (!u) return res.status(401).json({ error: '未登录' }); res.json({ username: u }); });
 
+// 发布Tab：仅用户新闻
 app.get('/api/news', (req, res) => {
+  const n = readJSON(NEWS_FILE);
+  res.json([...n.filter(x => x.pinned), ...n.filter(x => !x.pinned)]);
+});
+
+// 新闻库Tab：用户+示例
+app.get('/api/news/all', (req, res) => {
   const n = readJSON(NEWS_FILE);
   const userNews = [...n.filter(x => x.pinned), ...n.filter(x => !x.pinned)];
   res.json([...userNews, ...seedNews]);
@@ -251,8 +258,7 @@ app.post('/api/admin/reset-password', adminMiddleware, (req, res) => {
 
 io.on('connection', socket => {
   const n = readJSON(NEWS_FILE);
-  const userNews = [...n.filter(x => x.pinned), ...n.filter(x => !x.pinned)];
-  socket.emit('init-data', { news: [...userNews, ...seedNews], leaderboard: getLeaderboard() });
+  socket.emit('init-data', { news: [...n.filter(x => x.pinned), ...n.filter(x => !x.pinned)], leaderboard: getLeaderboard() });
   socket.on('disconnect', () => {});
 });
 

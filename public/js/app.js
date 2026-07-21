@@ -58,13 +58,13 @@ contentInput.addEventListener('input',()=>{charCount.textContent=contentInput.va
 newsForm.addEventListener('submit',async e=>{e.preventDefault();const c=contentInput.value.trim();if([...c].length<5){showToast('至少5字符','error');return}if(!authToken){showToast('请先登录','error');return}const btn=newsForm.querySelector('button');btn.disabled=true;btn.textContent='⏳';try{const r=await fetch('/api/news',{method:'POST',headers:{'Content-Type':'application/json',Authorization:authToken},body:JSON.stringify({content:c})});if(!r.ok){const d=await r.json();throw new Error(d.error)}contentInput.value='';charCount.textContent='0/500';showToast('✅发布成功','success')}catch(e){showToast('❌'+e.message,'error')}finally{btn.disabled=false;btn.textContent='🚀发布';}});
 
 // ═══ News Library ═══
-async function loadLibrary(){const q=searchInput.value.trim().toLowerCase();let list=allNews;if(q)list=allNews.filter(n=>n.content.toLowerCase().includes(q));libraryList.innerHTML=list.length?list.map((n,i)=>`<div class="lib-item"><span class="lib-num">${i+1}.</span><span class="lib-user">${esc(n.username)}</span><span class="lib-text">${esc(n.content.slice(0,120))}${n.content.length>120?'...':''}</span>${adminIPOk&&!n.id.startsWith('seed-')?`<button class=\"lib-del\" onclick=\"delFromLib('${n.id}')\">✕</button>`:''}</div>`).join(''):'<div class="empty-state"><p>未找到</p></div>';totalCount.textContent=allNews.length;}
+async function loadLibrary(){try{const r=await fetch('/api/news/all');allNews=await r.json()}catch{allNews=allNews||[]}const q=searchInput.value.trim().toLowerCase();let list=allNews;if(q)list=allNews.filter(n=>n.content.toLowerCase().includes(q));libraryList.innerHTML=list.length?list.map((n,i)=>`<div class="lib-item"><span class="lib-num">${i+1}.</span><span class="lib-user">${esc(n.username)}</span><span class="lib-text">${esc(n.content.slice(0,120))}${n.content.length>120?'...':''}</span>${adminIPOk&&!n.id.startsWith('seed-')?`<button class=\"lib-del\" onclick=\"delFromLib('${n.id}')\">✕</button>`:''}</div>`).join(''):'<div class="empty-state"><p>未找到</p></div>';totalCount.textContent=list.length;}
 searchInput.addEventListener('input',loadLibrary);
 downloadBtn.addEventListener('click',()=>{window.open('/api/news/download','_blank')});
 
 // ═══ Socket ═══
-socket.on('init-data',data=>{allNews=data.news;renderNews(data.news);renderLeaderboard(data.leaderboard);totalCount.textContent=data.news.length;});
-socket.on('news-added',item=>{allNews.unshift(item);prependNews(item);totalCount.textContent=allNews.length;});
+socket.on('init-data',data=>{allNews=data.news;renderNews(data.news);renderLeaderboard(data.leaderboard);fetch('/api/news/count').then(r=>r.json()).then(d=>{totalCount.textContent=d.count;allNewsCount=d.count});});
+socket.on('news-added',item=>{renderNews([item,...allNews.slice(0,50)]);fetch('/api/news/count').then(r=>r.json()).then(d=>totalCount.textContent=d.count);});
 socket.on('news-deleted',data=>{allNews=allNews.filter(n=>n.id!==data.id);const c=document.querySelector('[data-id=\"'+data.id+'\"]');if(c){c.style.opacity='0';c.style.transition='.3s';setTimeout(()=>c.remove(),300)}totalCount.textContent=allNews.length;});
 socket.on('leaderboard-updated',lb=>renderLeaderboard(lb));
 
