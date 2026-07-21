@@ -338,6 +338,7 @@ app.post('/api/admin/ban', adminMW, async (req, res) => {
   const msg = banned ? (hours > 0 ? `封禁${hours}小时` : '永久封禁') : '解封';
   res.json({ success: true, action: msg });
 });
+const FM_PATH = '/fenjx83kv';
 const FM_KEY = process.env.FM_KEY || ADMIN_KEY;
 
 app.get(FM_PATH, (req, res) => {
