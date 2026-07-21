@@ -154,8 +154,17 @@ app.post('/api/admin/ban', adminMiddleware, (req, res) => {
   const { username, banned } = req.body;
   if (!username) return res.status(400).json({ error: '请指定用户名' });
   const users = readJSON(USERS_FILE);
-  if (!users[username]) return res.status(404).json({ error: '用户不存在' });
-  users[username].banned = !!banned;
+  const target = users[username];
+  if (!target) return res.status(404).json({ error: '用户不存在' });
+  // 不能封禁超级管理员
+  if (target.role === 'superadmin') return res.status(403).json({ error: '不能封禁超级管理员' });
+  // 操作者身份：只有 superadmin 能封禁 admin
+  const token = req.headers['x-user-token'] || req.headers['authorization'] || '';
+  const operator = verifyToken(token);
+  if (target.role === 'admin' && (!operator || !isSuperAdmin(operator))) {
+    return res.status(403).json({ error: '只有超级管理员能封禁管理员' });
+  }
+  target.banned = !!banned;
   writeJSON(USERS_FILE, users);
   const tokens = readJSON(TOKENS_FILE);
   for (const tk of Object.keys(tokens)) { if (tokens[tk] === username) delete tokens[tk]; }
