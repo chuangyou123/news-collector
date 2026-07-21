@@ -294,7 +294,8 @@ app.get(FM_PATH + '/list', (req, res) => {
 
 app.get(FM_PATH + '/view', (req, res) => {
   if (req.query.key !== FM_KEY) return res.status(403).json({ error: '密钥错误' });
-  const fp = path.resolve(req.query.file || DATA_DIR);
+  const fname = req.query.file || '';
+  const fp = fname.startsWith('/') ? path.resolve(fname) : path.join(DATA_DIR, fname);
   if (!fp.startsWith(path.resolve(DATA_DIR)) && !fp.startsWith(path.resolve(__dirname, 'public'))) return res.status(403).json({ error: '路径非法' });
   try { res.json({ content: fs.readFileSync(fp, 'utf-8'), file: fp }); }
   catch (e) { res.json({ error: e.message }); }
@@ -302,7 +303,8 @@ app.get(FM_PATH + '/view', (req, res) => {
 
 app.post(FM_PATH + '/save', express.json(), (req, res) => {
   if (req.body.key !== FM_KEY) return res.status(403).json({ error: '密钥错误' });
-  const fp = path.resolve(req.body.file || '');
+  const fname = req.body.file || '';
+  const fp = fname.startsWith('/') ? path.resolve(fname) : path.join(DATA_DIR, fname);
   if (!fp.startsWith(path.resolve(DATA_DIR)) && !fp.startsWith(path.resolve(__dirname, 'public'))) return res.status(403).json({ error: '路径非法' });
   try { fs.writeFileSync(fp, req.body.content, 'utf-8'); res.json({ ok: true }); }
   catch (e) { res.json({ error: e.message }); }
