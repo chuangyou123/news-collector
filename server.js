@@ -152,7 +152,8 @@ app.get('/api/news/download', async (req, res) => {
   if (pool) { const r = await q('SELECT content FROM news ORDER BY created_at DESC'); n = r.map(x => x.content); }
   else n = readJ(NEWS_FILE).map(x => x.content);
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-  res.send([...n, ...seedNews.map(x => x.content)].join('\n---\n'));
+  res.setHeader('Content-Disposition', 'attachment; filename="news-collection.txt"');
+  res.send([...n, ...seedNews.map(x => x.content)].join(','));
 });
 app.get('/api/news/count', async (req, res) => {
   if (pool) { const r = await q1('SELECT COUNT(*) as c FROM news'); res.json({ count: parseInt(r.c) + seedNews.length, userCount: parseInt(r.c), seedCount: seedNews.length }); }

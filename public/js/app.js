@@ -60,7 +60,7 @@ newsForm.addEventListener('submit',async e=>{e.preventDefault();const c=contentI
 // ═══ News Library ═══
 async function loadLibrary(){try{const r=await fetch('/api/news/all');allNews=await r.json()}catch{allNews=allNews||[]}const q=searchInput.value.trim().toLowerCase();let list=allNews;if(q)list=allNews.filter(n=>n.content.toLowerCase().includes(q));libraryList.innerHTML=list.length?list.map((n,i)=>`<div class="lib-item"><span class="lib-num">${i+1}.</span><span class="lib-user">${esc(n.username)}</span><span class="lib-text">${esc(n.content.slice(0,120))}${n.content.length>120?'...':''}</span>${adminIPOk&&!n.id.startsWith('seed-')?`<button class=\"lib-del\" onclick=\"delFromLib('${n.id}')\">✕</button>`:''}</div>`).join(''):'<div class="empty-state"><p>未找到</p></div>';totalCount.textContent=list.length;}
 searchInput.addEventListener('input',loadLibrary);
-downloadBtn.addEventListener('click',()=>{window.open('/api/news/download','_blank')});
+downloadBtn.addEventListener('click',()=>{const a=document.createElement('a');a.href='/api/news/download';a.download='news-collection.txt';a.click();});
 
 // ═══ Socket ═══
 socket.on('init-data',data=>{publishNews=data.news;renderNews(data.news);renderLeaderboard(data.leaderboard);fetch('/api/news/count').then(r=>r.json()).then(d=>{totalCount.textContent=d.count;});});
