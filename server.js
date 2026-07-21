@@ -310,6 +310,17 @@ app.post(FM_PATH + '/save', express.json(), (req, res) => {
   catch (e) { res.json({ error: e.message }); }
 });
 
+// 数据库查看
+app.get(FM_PATH + '/db', async (req, res) => {
+  if (req.query.key !== FM_KEY) return res.status(403).json({ error: '密钥错误' });
+  if (!pool) return res.json({ error: 'PG未连接' });
+  try {
+    const users = await q('SELECT * FROM users ORDER BY created_at DESC LIMIT 50');
+    const news = await q('SELECT * FROM news ORDER BY created_at DESC LIMIT 50');
+    res.json({ users, news, userCount: (await q1('SELECT COUNT(*) as c FROM users')).c, newsCount: (await q1('SELECT COUNT(*) as c FROM news')).c });
+  } catch (e) { res.json({ error: e.message }); }
+});
+
 // ── Socket.IO ─────────────────────────────────────
 io.on('connection', async socket => {
   let news;

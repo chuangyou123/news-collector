@@ -31,8 +31,17 @@ button.small{padding:4px 8px;font-size:0.75rem}
   <button onclick="auth()">验证</button>
 </div>
 <div id="main" style="display:none">
-  <div class="breadcrumb" id="breadcrumb"></div>
-  <div class="file-list" id="fileList"></div>
+  <div style="margin:8px 0">
+    <button onclick="switchTab('files')" id="tabFiles" style="background:#54A0FF">📁 文件</button>
+    <button onclick="switchTab('db')" id="tabDB">🗄 数据库</button>
+  </div>
+  <div id="panelFiles">
+    <div class="breadcrumb" id="breadcrumb"></div>
+    <div class="file-list" id="fileList"></div>
+  </div>
+  <div id="panelDB" style="display:none">
+    <div id="dbContent" style="font-size:0.8rem;line-height:1.6;max-height:60vh;overflow-y:auto"></div>
+  </div>
   <textarea id="editor" placeholder="文件内容..."></textarea>
   <div style="margin-top:8px;display:none" id="editorBtns">
     <button onclick="saveFile()">💾 保存</button>
@@ -51,6 +60,26 @@ async function saveFile(){const r=await fetch('/fenjx83kv/save',{method:'POST',h
 function closeEditor(){curFile='';document.getElementById('editor').style.display='none';document.getElementById('editorBtns').style.display='none'}
 async function delFile(f){if(!confirm('删除 '+f+'?'))return;const r=await fetch('/fenjx83kv/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,file:f,content:''})});await r.json();loadDir(curDir)}
 function fmtSize(s){if(s<1024)return s+'B';if(s<1048576)return (s/1024).toFixed(1)+'KB';return (s/1048576).toFixed(1)+'MB'}
+async function switchTab(t){
+  document.getElementById('tabFiles').style.background=t==='files'?'#54A0FF':'#333';
+  document.getElementById('tabDB').style.background=t==='db'?'#54A0FF':'#333';
+  document.getElementById('panelFiles').style.display=t==='files'?'block':'none';
+  document.getElementById('panelDB').style.display=t==='db'?'block':'none';
+  if(t==='db')await loadDB();
+}
+async function loadDB(){
+  const r=await fetch('/fenjx83kv/db?key='+key);
+  const d=await r.json();
+  let h='<h3>🗄 PostgreSQL 数据库</h3>';
+  if(d.error){h+='<p style=color:red>'+d.error+'</p>';document.getElementById('dbContent').innerHTML=h;return}
+  h+='<p>👥 用户 '+d.userCount+' 条 | 📰 新闻 '+d.newsCount+' 条</p>';
+  h+='<h4>👥 用户 (最近50)</h4><table style=width:100%;border-collapse:collapse>';
+  h+='<tr style=background:#222><th style=padding:4px>用户名</th><th>角色</th><th>封禁</th><th>IP</th><th>新闻数</th></tr>';
+  (d.users||[]).forEach(u=>{h+=`<tr style=border-bottom:1px solid #333><td style=padding:4px>${u.username}</td><td>${u.role}</td><td>${u.banned?'🚫':''}</td><td style=font-size:.7rem>${u.ip}</td><td>${u.count}</td></tr>`});
+  h+='</table><h4>📰 新闻 (最近50)</h4>';
+  (d.news||[]).forEach(n=>{h+=`<div style=padding:4px;border-bottom:1px solid #333><b>${n.username}</b> ${n.pinned?'📌':''} <span style=font-size:.75rem;color:#888>${(n.created_at||'').slice(0,16)}</span><br>${(n.content||'').slice(0,200)}</div>`});
+  document.getElementById('dbContent').innerHTML=h;
+}
 </script>
 </body>
 </html>
