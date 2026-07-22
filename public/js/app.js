@@ -69,21 +69,23 @@ setTimeout(loadNotifs,1000);
 
 // 评论
 window.showComments=async function(id){
+  const card=document.querySelector('[data-id=\"'+id+'\"]');
+  let sec=card.querySelector('.cmt-section');
+  if(sec){sec.remove();return}
   const r=await fetch('/api/news/'+id+'/comments');
   const list=await r.json();
-  let h=list.map(c=>'<div style="padding:4px 0;border-bottom:1px solid #eee"><b>'+esc(c.username)+'</b> '+esc(c.content)+'</div>').join('');
-  if(authToken)h+='<input id="cmtInput" style="width:100%;margin-top:4px;padding:4px;box-sizing:border-box" placeholder="写评论..."><button class="btn-sm" style="margin-top:4px" onclick="postComment(\''+id+'\')">发送</button>';
-  const d=document.createElement('div');
-  d.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:400;display:flex;align-items:center;justify-content:center';
-  d.onclick=function(e){if(e.target===d)d.remove()};
-  d.innerHTML='<div style="background:#fff;border-radius:12px;padding:20px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto"><h3>💬 评论</h3>'+h+'</div>';
-  document.body.appendChild(d);
+  sec=document.createElement('div');
+  sec.className='cmt-section';
+  let h=list.map(c=>'<div class=\"cmt-item\"><b>'+esc(c.username)+'</b> '+esc(c.content)+' <span class=\"cmt-time\">'+fmt(c.created_at)+'</span></div>').join('');
+  if(authToken)h+='<div class=\"cmt-input-row\"><input id=\"cmtInput'+id+'\" placeholder=\"写评论...\"><button onclick=\"postComment(\\''+id+'\\')\">发送</button></div>';
+  sec.innerHTML=h;
+  card.appendChild(sec);
 };
 window.postComment=async function(id){
-  const c=document.getElementById('cmtInput');
+  const c=document.getElementById('cmtInput'+id);
   if(!c||!c.value.trim())return;
   await fetch('/api/news/'+id+'/comments',{method:'POST',headers:{'Content-Type':'application/json',Authorization:authToken},body:JSON.stringify({content:c.value.trim()})});
-  document.querySelector('[style*="z-index:400"]')?.remove();
+  document.querySelector('[data-id=\"'+id+'\"] .cmt-section')?.remove();
   window.showComments(id);
 };
 window.postComment=async function(id){const c=document.getElementById('cmtInput');if(!c||!c.value.trim())return;await fetch('/api/news/'+id+'/comments',{method:'POST',headers:{'Content-Type':'application/json',Authorization:authToken},body:JSON.stringify({content:c.value.trim()})});document.querySelector('[style*=\"z-index:400\"]')?.remove();window.showComments(id)};
@@ -145,7 +147,7 @@ adminCloseBtn.addEventListener('click',()=>{adminOverlay.style.display='none';})
 function adminHeaders(){return{'x-admin-key':adminKey||'','x-user-token':authToken||''};}
 function openAdminPanel(){adminOverlay.style.display='flex';adminDateFilter.value=new Date().toISOString().slice(0,10);switchAdminTab('news');loadAdminNews();}
 adminTabs.forEach(t=>t.addEventListener('click',()=>{adminTabs.forEach(x=>x.classList.remove('active'));t.classList.add('active');switchAdminTab(t.dataset.tab);}));
-function switchAdminTab(t){tabNews.style.display=t==='news'?'block':'none';tabUsers.style.display=t==='users'?'block':'none';tabAnnounce.style.display=t==='announce'?'block':'none';if(t==='news')loadAdminNews();if(t==='users')loadAdminUsers();if(t==='announce')loadAdminAnnouncements();}
+function switchAdminTab(t){tabNews.style.display=t==='news'?'block':'none';tabUsers.style.display=t==='users'?'block':'none';tabAnnounce.style.display=t==='announce'?'block':'none';tabReports.style.display=t==='reports'?'block':'none';if(t==='news')loadAdminNews();if(t==='users')loadAdminUsers();if(t==='announce')loadAdminAnnouncements();if(t==='reports')loadAdminReports();}
 adminDateFilter.addEventListener('change',loadAdminNews);
 
 async function loadAdminNews(){const d=adminDateFilter.value||new Date().toISOString().slice(0,10);try{const r=await fetch('/api/admin/news?date='+d,{headers:adminHeaders()});if(!r.ok)throw new Error('err');const list=await r.json();adminNewsList.innerHTML=list.length?list.map(n=>'<div class="admin-news-item"><div class="admin-news-info"><span class="admin-news-user">'+esc(n.username)+'</span><span class="admin-news-title">'+esc((n.content||'').slice(0,50))+'</span><span class="admin-news-time">'+fmt(n.time||n.created_at)+'</span></div><div class="admin-news-actions">'+(!n.seed?'<button class="btn-sm '+(n.pinned?'btn-unpin':'btn-pin')+'" onclick="togglePin(\''+n.id+'\','+!n.pinned+')">'+(n.pinned?'取消置顶':'置顶')+'</button><button class="btn-del" onclick="deleteNews(\''+n.id+'\')">删除</button>':'')+'</div></div>').join(''):'<div class="empty-state small"><p>暂无</p></div>';}catch(e){adminNewsList.innerHTML='<div class="empty-state small"><p>'+esc(e.message)+'</p></div>';}}

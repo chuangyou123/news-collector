@@ -806,6 +806,18 @@ textarea {
 .rpt-btn { border:none;background:none;cursor:pointer;font-size:0.8rem;padding:2px 6px;border-radius:4px;opacity:0.5 }
 .rpt-btn:hover { opacity:1;background:#FEE2E2 }
 
+/* 内嵌评论(B站风格) */
+.cmt-section { border-top:1px solid #eee;margin-top:8px;padding-top:8px;font-size:0.85rem }
+.cmt-item { padding:4px 0;border-bottom:1px solid #f0f0f0 }
+.cmt-item b { color:#4F46E5;margin-right:4px }
+.cmt-time { color:#999;font-size:0.7rem;margin-left:8px }
+.cmt-input-row { display:flex;gap:6px;margin-top:8px }
+.cmt-input-row input { flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.85rem;outline:none }
+.cmt-input-row button { padding:6px 14px;background:#4F46E5;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem }
+body.dark .cmt-section { border-color:#334155 }
+body.dark .cmt-item { border-color:#1e293b }
+body.dark .cmt-item b { color:#818CF8 }
+
 /* 深色模式 */
 body.dark { background:#0f172a;color:#e2e8f0 }
 body.dark header { background:linear-gradient(135deg,#1e1b4b,#312e81) }
