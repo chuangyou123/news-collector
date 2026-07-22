@@ -35,6 +35,7 @@ if (pg && process.env.DATABASE_URL) {
     await pool.query(`CREATE TABLE IF NOT EXISTS tokens(token VARCHAR(64) PRIMARY KEY, username VARCHAR(20), created_at TIMESTAMPTZ DEFAULT NOW())`);
     await pool.query(`CREATE TABLE IF NOT EXISTS warnings(id SERIAL PRIMARY KEY, username VARCHAR(20), reason TEXT, warned_by VARCHAR(20), created_at TIMESTAMPTZ DEFAULT NOW())`);
     await pool.query(`CREATE TABLE IF NOT EXISTS announcements(id SERIAL PRIMARY KEY, content TEXT, created_by VARCHAR(20), created_at TIMESTAMPTZ DEFAULT NOW())`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS likes(news_id VARCHAR(20), username VARCHAR(20), PRIMARY KEY(news_id, username))`);
     console.log('✅ PostgreSQL 已就绪');
   })().catch(e => { console.log('PG init error:', e.message); pool = null; });
 }
@@ -140,12 +141,12 @@ app.get('/api/me', async (req, res) => { const t = req.headers['authorization'] 
 
 // ── News API ──────────────────────────────────────
 app.get('/api/news', async (req, res) => {
-  if (pool) { res.json(await q('SELECT id, username, content, pinned, created_at as time FROM news ORDER BY pinned DESC, created_at DESC')); }
+  if (pool) { res.json(await q(`SELECT n.id, n.username, n.content, n.pinned, n.created_at as time, COUNT(l.username) as likes FROM news n LEFT JOIN likes l ON n.id=l.news_id GROUP BY n.id ORDER BY n.pinned DESC, n.created_at DESC`)); }
   else { const n = readJ(NEWS_FILE); res.json([...n.filter(x => x.pinned), ...n.filter(x => !x.pinned)]); }
 });
 app.get('/api/news/all', async (req, res) => {
   let userNews;
-  if (pool) userNews = await q('SELECT id, username, content, pinned, created_at as time FROM news ORDER BY pinned DESC, created_at DESC');
+  if (pool) userNews = await q(`SELECT n.id, n.username, n.content, n.pinned, n.created_at as time, COUNT(l.username) as likes FROM news n LEFT JOIN likes l ON n.id=l.news_id GROUP BY n.id ORDER BY n.pinned DESC, n.created_at DESC`);
   else { const n = readJ(NEWS_FILE); userNews = [...n.filter(x => x.pinned), ...n.filter(x => !x.pinned)]; }
   res.json([...userNews, ...seedNews]);
 });
@@ -182,6 +183,39 @@ app.post('/api/news', authMW, async (req, res) => {
   io.emit('news-added', item);
   io.emit('leaderboard-updated', await getLeaderboard());
   res.json({ success: true, news: item });
+});
+
+// 用户删除自己的新闻
+app.delete('/api/news/:id', authMW, async (req, res) => {
+  const { id } = req.params;
+  if (pool) {
+    const item = await q1('SELECT * FROM news WHERE id=$1', [id]);
+    if (!item) return res.status(404).json({ error: '不存在' });
+    if (item.username !== req.currentUser) return res.status(403).json({ error: '只能删除自己的新闻' });
+    await pool.query('DELETE FROM news WHERE id=$1', [id]);
+    await pool.query('UPDATE users SET count=GREATEST(count-1,0) WHERE username=$1', [req.currentUser]);
+  }
+  io.emit('news-deleted', { id });
+  io.emit('leaderboard-updated', await getLeaderboard());
+  res.json({ success: true });
+});
+
+// 点赞/取消点赞
+app.post('/api/news/:id/like', authMW, async (req, res) => {
+  const { id } = req.params;
+  const username = req.currentUser;
+  if (pool) {
+    const existing = await q1('SELECT * FROM likes WHERE news_id=$1 AND username=$2', [id, username]);
+    if (existing) {
+      await pool.query('DELETE FROM likes WHERE news_id=$1 AND username=$2', [id, username]);
+      res.json({ liked: false });
+    } else {
+      await pool.query('INSERT INTO likes(news_id,username) VALUES($1,$2)', [id, username]);
+      res.json({ liked: true });
+    }
+  } else {
+    res.json({ liked: false });
+  }
 });
 
 // ── Admin API ─────────────────────────────────────

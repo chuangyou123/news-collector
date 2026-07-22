@@ -340,6 +340,15 @@ textarea {
 }
 .news-card:hover .news-del-btn { opacity: 1; }
 .news-del-btn:hover { background: #EF4444; color: #fff; }
+
+/* 点赞 & 撤销 */
+.news-actions { display:flex;gap:8px;align-items:center;margin-top:8px }
+.like-btn { border:none;background:none;cursor:pointer;font-size:0.85rem;padding:4px 8px;border-radius:6px;transition:.15s }
+.like-btn:hover { background:#FEE2E2 }
+.like-btn.liked { color:#EF4444;font-weight:600 }
+.self-del-btn { border:none;background:none;cursor:pointer;font-size:0.75rem;color:#999;padding:2px 8px;border-radius:4px;transition:.15s }
+.self-del-btn:hover { color:#EF4444;background:#FEE2E2 }
+.news-card:hover .news-actions .self-del-btn { color:#EF4444 }
 .btn-pin { background: #FEF3C7; color: #D97706; }
 .btn-pin:hover { background: #FDE68A; }
 .btn-unpin { background: #F1F5F9; color: #64748B; }
