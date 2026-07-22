@@ -76,7 +76,7 @@ async function loadAnnouncements(){try{const r=await fetch('/api/announcements')
 function showAnnounce(content,by,time){announceText.textContent=content;announceTime.textContent=' - '+by+' '+fmt(time);announceBanner.style.display='block';}
 
 // 同步服务器点赞状态
-async function loadMyLikes(){if(!authToken)return;try{const r=await fetch('/api/news',{headers:{Authorization:authToken}});const list=await r.json();myLikes.clear();list.forEach(n=>{if(n.liked_by_me)myLikes.add(n.id)});localStorage.setItem('myLikes',JSON.stringify([...myLikes]));renderNews(list)}catch{}}
+async function loadMyLikes(){if(!authToken)return;try{const r=await fetch('/api/news',{headers:{Authorization:authToken}});const d=await r.json();const list=d.items||d;myLikes.clear();if(Array.isArray(list))list.forEach(n=>{if(n.liked_by_me)myLikes.add(n.id)});localStorage.setItem('myLikes',JSON.stringify([...myLikes]))}catch{}}
 
 // ═══ Render ═══
 function renderNews(arr){if(!arr||!arr.length){newsList.innerHTML='<div class="empty-state"><div class="empty-icon">x</div><p>no news</p></div>';return}newsList.innerHTML=arr.map(n=>newsCardHTML(n)).join('');}
