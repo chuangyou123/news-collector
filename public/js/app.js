@@ -55,7 +55,9 @@ logoutBtn.addEventListener('click',()=>{if(authToken)fetch('/api/logout',{method
 (async()=>{const t=localStorage.getItem('nc_token');if(!t)return;try{const r=await fetch('/api/me',{headers:{Authorization:t}});if(!r.ok){localStorage.clear();return}const d=await r.json();currentUser=d.username;authToken=t;userArea.style.display='none';userInfo.style.display='flex';userBadge.textContent=d.username;uploadCard.style.display='block';checkAdminIP();}catch{}})();
 async function checkAdminIP(){try{const r=await fetch('/api/admin/check',{headers:authToken?{Authorization:authToken}:{}});const d=await r.json();adminIPOk=d.allowed;if(adminIPOk)adminBtn.style.display='inline-block';}catch{adminIPOk=false;}}
 // 标签
-async function loadTags(){try{const r=await fetch('/api/tags');const tags=await r.json();const s=$('#tagFilter');if(s&&tags.length){s.innerHTML='<option value=\"\">全部标签</option>'+tags.map(t=>'<option value=\"'+t.name+'\">'+t.name+'</option>').join('');s.style.display='inline-block';s.addEventListener('change',()=>{location.href='/?tag='+s.value})}}catch{}}
+let selectedTag='';
+async function loadTags(){try{const r=await fetch('/api/tags');const tags=await r.json();const s=$('#tagFilter');if(s&&tags.length){s.innerHTML='<option value=\"\">全部标签</option>'+tags.map(t=>'<option value=\"'+t.name+'\">'+t.name+'</option>').join('');s.style.display='inline-block';s.addEventListener('change',async()=>{selectedTag=s.value;await filterByTag()})}}catch{}}
+async function filterByTag(){const h=authToken?{Authorization:authToken}:{};const tag=selectedTag?'&tag='+selectedTag:'';const r=await fetch('/api/news?limit=50'+tag,{headers:h});const d=await r.json();const list=d.items||d;renderNews(list)}
 setTimeout(loadTags,800);
 
 // ═══ Publish ═══
