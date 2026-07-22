@@ -409,7 +409,17 @@ app.post('/api/user/color', authMW, async (req, res) => {
   res.json({ success: true });
 });
 
-// ── Admin API ─────────────────────────────────────
+app.post('/api/admin/assign-tag', adminMW, async (req, res) => {
+  const { id, tag } = req.body;
+  if (!id || !tag) return res.status(400).json({ error: '参数错误' });
+  if (pool) {
+    const t = await q1('SELECT id FROM tags WHERE name=$1', [tag]);
+    if (t) {
+      await pool.query('INSERT INTO news_tags(news_id,tag_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [id, t.id]);
+      res.json({ success: true });
+    } else res.json({ error: '标签不存在' });
+  } else res.json({ error: '需要PG' });
+});
 app.get('/api/admin/check', async (req, res) => {
   if (isAdminIP(req)) return res.json({ allowed: true });
   const t = req.headers['authorization'] || req.query.token;
