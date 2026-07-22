@@ -29,7 +29,7 @@ let pwdModalUsername=null;
 
 // State
 let currentUser=null,authToken=null,mode='login',adminIPOk=false,adminKey=null;
-let allNews=[],publishNews=[],myLikes=new Set();
+let allNews=[],publishNews=[],myLikes=new Set(JSON.parse(localStorage.getItem('myLikes')||'[]'));
 
 // ═══ Main Tabs ═══
 mainTabs.forEach(t=>t.addEventListener('click',()=>{
@@ -89,7 +89,7 @@ window.delFromLib=async function(id){if(!confirm('确定删除？'))return;if(!a
 window.delOwnNews=async function(id){if(!confirm('确定撤销这条新闻？'))return;try{const r=await fetch('/api/news/'+id,{method:'DELETE',headers:{Authorization:authToken}});if(!r.ok)throw new Error((await r.json()).error);showToast('已撤销','success')}catch(e){showToast(e.message,'error')}};
 
 // 点赞
-window.toggleLike=async function(id,btn){if(!authToken){showToast('请先登录','error');return}const wasLiked=myLikes.has(id);try{const r=await fetch('/api/news/'+id+'/like',{method:'POST',headers:{Authorization:authToken}});const d=await r.json();if(d.liked)myLikes.add(id);else myLikes.delete(id);btn.classList.toggle('liked',d.liked);const span=btn.querySelector('span');span.textContent=(parseInt(span.textContent)||0)+(d.liked?1:-1)}catch(e){showToast(e.message,'error')}};
+window.toggleLike=async function(id,btn){if(!authToken){showToast('请先登录','error');return}const wasLiked=myLikes.has(id);try{const r=await fetch('/api/news/'+id+'/like',{method:'POST',headers:{Authorization:authToken}});const d=await r.json();if(d.liked)myLikes.add(id);else myLikes.delete(id);localStorage.setItem('myLikes',JSON.stringify([...myLikes]));btn.classList.toggle('liked',d.liked);const span=btn.querySelector('span');span.textContent=(parseInt(span.textContent)||0)+(d.liked?1:-1)}catch(e){showToast(e.message,'error')}};
 
 // ═══ Admin Panel ═══
 adminBtn.addEventListener('click',()=>{adminKeyInput.value='';adminKeyOverlay.style.display='flex';adminKeyInput.focus();});
