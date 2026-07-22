@@ -29,8 +29,6 @@
     <button class="main-tab active" data-tab="publish">📝 发布新闻</button>
     <button class="main-tab" data-tab="library">📚 新闻库</button>
     <button class="main-tab" data-tab="rank">🏆 排行榜</button>
-    <button class="sort-btn active" data-sort="new">🕐 最新</button>
-    <button class="sort-btn" data-sort="hot">🔥 最热</button>
     <select id="tagFilter" style="display:none;padding:6px 10px;border-radius:6px;border:1px solid #ccc"><option value="">全部标签</option></select>
     <button id="darkToggle" style="margin-left:auto;background:none;border:none;font-size:1.2rem;cursor:pointer" title="深色模式">🌙</button>
     <span class="total-count">本站已收录 <strong id="totalCount">0</strong> 条新闻</span>
@@ -42,6 +40,11 @@
       <span class="announce-text" id="announceText"></span>
       <span class="announce-time" id="announceTime"></span>
     </div>
+  </div>
+
+  <div class="sort-row">
+    <button class="sort-btn active" data-sort="new">🕐 最新</button>
+    <button class="sort-btn" data-sort="hot">🔥 最热</button>
   </div>
 
   <div class="main-container">
