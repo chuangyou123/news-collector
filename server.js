@@ -425,7 +425,7 @@ app.get(FM_PATH + '/db', async (req, res) => {
 // ── Socket.IO ─────────────────────────────────────
 io.on('connection', async socket => {
   let news;
-  if (pool) news = await q('SELECT id, username, content, pinned, created_at as time FROM news ORDER BY pinned DESC, created_at DESC');
+  if (pool) news = await q(`SELECT n.id, n.username, n.content, n.pinned, n.created_at as time, COUNT(l.username) as likes FROM news n LEFT JOIN likes l ON n.id=l.news_id GROUP BY n.id ORDER BY n.pinned DESC, n.created_at DESC`);
   else { const n = readJ(NEWS_FILE); news = [...n.filter(x => x.pinned), ...n.filter(x => !x.pinned)]; }
   socket.emit('init-data', { news, leaderboard: await getLeaderboard() });
   socket.on('disconnect', () => {});

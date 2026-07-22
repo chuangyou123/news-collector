@@ -65,7 +65,7 @@ searchInput.addEventListener('input',loadLibrary);
 downloadBtn.addEventListener('click',()=>{const a=document.createElement('a');a.href='/api/news/download';a.download='news-collection.txt';a.click();});
 
 // ═══ Socket ═══
-socket.on('init-data',data=>{publishNews=data.news;data.news.forEach(n=>{if(n.liked_by_me)myLikes.add(n.id)});localStorage.setItem('myLikes',JSON.stringify([...myLikes]));renderNews(data.news);renderLeaderboard(data.leaderboard);fetch('/api/news/count').then(r=>r.json()).then(d=>{totalCount.textContent=d.count;});loadAnnouncements();});
+socket.on('init-data',data=>{publishNews=data.news;renderNews(data.news);renderLeaderboard(data.leaderboard);fetch('/api/news/count').then(r=>r.json()).then(d=>{totalCount.textContent=d.count;});loadAnnouncements();loadMyLikes();});
 socket.on('news-added',item=>{publishNews.unshift(item);prependNews(item);fetch('/api/news/count').then(r=>r.json()).then(d=>totalCount.textContent=d.count);});
 socket.on('news-deleted',data=>{publishNews=publishNews.filter(n=>n.id!==data.id);const c=document.querySelector('[data-id="'+data.id+'"]');if(c){c.style.opacity='0';c.style.transition='.3s';setTimeout(()=>c.remove(),300)}fetch('/api/news/count').then(r=>r.json()).then(d=>totalCount.textContent=d.count);});
 socket.on('leaderboard-updated',lb=>renderLeaderboard(lb));
@@ -74,6 +74,9 @@ socket.on('announcement-added',a=>{showAnnounce(a.content,a.created_by,a.created
 // ═══ Announcements ═══
 async function loadAnnouncements(){try{const r=await fetch('/api/announcements');const list=await r.json();if(list.length){const a=list[0];showAnnounce(a.content,a.created_by,a.created_at)}}catch{}}
 function showAnnounce(content,by,time){announceText.textContent=content;announceTime.textContent=' - '+by+' '+fmt(time);announceBanner.style.display='block';}
+
+// 同步服务器点赞状态
+async function loadMyLikes(){if(!authToken)return;try{const r=await fetch('/api/news',{headers:{Authorization:authToken}});const list=await r.json();myLikes.clear();list.forEach(n=>{if(n.liked_by_me)myLikes.add(n.id)});localStorage.setItem('myLikes',JSON.stringify([...myLikes]));renderNews(list)}catch{}}
 
 // ═══ Render ═══
 function renderNews(arr){if(!arr||!arr.length){newsList.innerHTML='<div class="empty-state"><div class="empty-icon">x</div><p>no news</p></div>';return}newsList.innerHTML=arr.map(n=>newsCardHTML(n)).join('');}
