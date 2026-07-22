@@ -18,6 +18,7 @@
       </div>
       <div class="user-info" id="userInfo" style="display:none;">
         <span class="user-badge" id="userBadge"></span>
+        <button id="notifBtn" class="btn-sm" style="display:none;position:relative" title="通知">🔔<span id="notifBadge" style="display:none;position:absolute;top:-4px;right:-4px;background:red;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;line-height:16px;text-align:center">0</span></button>
         <button id="adminBtn" class="btn-admin" style="display:none;" title="管理面板">⚙️</button>
         <button id="logoutBtn" class="btn-sm">退出</button>
       </div>
@@ -47,6 +48,7 @@
         <h3>📝 分享新闻</h3>
         <form id="newsForm" autocomplete="off">
           <textarea id="contentInput" placeholder="写点什么...（5-500字）" maxlength="500" rows="3"></textarea>
+          <select id="tagSelect" style="margin-top:8px;padding:6px 10px;border-radius:6px;border:1px solid #ccc;width:100%"><option value="">选择标签（可选）</option></select>
           <div class="form-actions">
             <span class="char-count" id="charCount">0/500</span>
             <button type="submit" class="btn-primary">🚀 发布</button>

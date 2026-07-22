@@ -60,6 +60,34 @@ async function loadTags(){try{const r=await fetch('/api/tags');const tags=await 
 async function filterByTag(){const h=authToken?{Authorization:authToken}:{};const tag=selectedTag?'&tag='+selectedTag:'';const r=await fetch('/api/news?limit=50'+tag,{headers:h});const d=await r.json();const list=d.items||d;renderNews(list)}
 setTimeout(loadTags,800);
 
+// 通知
+const notifBtn=$('#notifBtn'),notifBadge=$('#notifBadge');
+let unreadNotifs=0;
+async function loadNotifs(){if(!authToken)return;try{const r=await fetch('/api/notifications',{headers:{Authorization:authToken}});const list=await r.json();unreadNotifs=list.filter(n=>!n.seen).length;notifBadge.textContent=unreadNotifs;notifBadge.style.display=unreadNotifs>0?'block':'none';notifBtn.style.display='inline-block';notifBtn.onclick=()=>{let h='<h3>通知</h3>';list.forEach(n=>{h+='<div style=\"padding:6px;border-bottom:1px solid #ddd\">'+esc(n.content)+' <span style=\"color:#888;font-size:.7rem\">'+fmt(n.created_at)+'</span></div>'});showToast(h,'info');fetch('/api/notifications/read',{method:'POST',headers:{Authorization:authToken}});unreadNotifs=0;notifBadge.style.display='none'}}catch(e){}}
+setInterval(loadNotifs,30000);
+setTimeout(loadNotifs,1000);
+
+// 评论
+window.showComments=async function(id){
+  const r=await fetch('/api/news/'+id+'/comments');
+  const list=await r.json();
+  let h=list.map(c=>'<div style="padding:4px 0;border-bottom:1px solid #eee"><b>'+esc(c.username)+'</b> '+esc(c.content)+'</div>').join('');
+  if(authToken)h+='<input id="cmtInput" style="width:100%;margin-top:4px;padding:4px;box-sizing:border-box" placeholder="写评论..."><button class="btn-sm" style="margin-top:4px" onclick="postComment(\''+id+'\')">发送</button>';
+  const d=document.createElement('div');
+  d.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:400;display:flex;align-items:center;justify-content:center';
+  d.onclick=function(e){if(e.target===d)d.remove()};
+  d.innerHTML='<div style="background:#fff;border-radius:12px;padding:20px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto"><h3>💬 评论</h3>'+h+'</div>';
+  document.body.appendChild(d);
+};
+window.postComment=async function(id){
+  const c=document.getElementById('cmtInput');
+  if(!c||!c.value.trim())return;
+  await fetch('/api/news/'+id+'/comments',{method:'POST',headers:{'Content-Type':'application/json',Authorization:authToken},body:JSON.stringify({content:c.value.trim()})});
+  document.querySelector('[style*="z-index:400"]')?.remove();
+  window.showComments(id);
+};
+window.postComment=async function(id){const c=document.getElementById('cmtInput');if(!c||!c.value.trim())return;await fetch('/api/news/'+id+'/comments',{method:'POST',headers:{'Content-Type':'application/json',Authorization:authToken},body:JSON.stringify({content:c.value.trim()})});document.querySelector('[style*=\"z-index:400\"]')?.remove();window.showComments(id)};
+
 // ═══ Publish ═══
 contentInput.addEventListener('input',()=>{charCount.textContent=contentInput.value.length+'/500';});
 newsForm.addEventListener('submit',async e=>{e.preventDefault();const c=contentInput.value.trim();if([...c].length<5){showToast('至少5字符','error');return}if(!authToken){showToast('请先登录','error');return}const btn=newsForm.querySelector('button');btn.disabled=true;btn.textContent='...';try{const tag=$('#tagSelect').value;const r=await fetch('/api/news',{method:'POST',headers:{'Content-Type':'application/json',Authorization:authToken},body:JSON.stringify({content:c,tag})});if(!r.ok){const d=await r.json();throw new Error(d.error)}contentInput.value='';charCount.textContent='0/500';showToast('发布成功','success')}catch(e){showToast(e.message,'error')}finally{btn.disabled=false;btn.textContent='发布';}});
@@ -93,7 +121,7 @@ async function loadMyLikes(){if(!authToken)return;try{const r=await fetch('/api/
 // ═══ Render ═══
 function renderNews(arr){if(!arr||!arr.length){newsList.innerHTML='<div class="empty-state"><div class="empty-icon">x</div><p>no news</p></div>';return}newsList.innerHTML=arr.map(n=>newsCardHTML(n)).join('');}
 function prependNews(item){const e=newsList.querySelector('.empty-state');if(e)e.remove();const d=document.createElement('div');d.innerHTML=newsCardHTML(item);newsList.insertBefore(d.firstElementChild,newsList.firstChild);}
-function newsCardHTML(item){const i=(item.username||'?')[0].toUpperCase(),c=getColor(item.username);const isMine=currentUser&&item.username===currentUser;const likes=parseInt(item.likes)||0;const liked=myLikes.has(item.id);return '<div class="news-card '+(item.pinned?'pinned':'')+'" data-id="'+item.id+'"><div class="news-header"><div class="news-avatar" style="background:'+c+'">'+i+'</div><div class="news-meta"><div class="news-username">'+esc(item.username)+' '+(item.pinned?'<span class="pin-badge">置顶</span>':'')+'</div><div class="news-time">'+fmt(item.time||item.created_at)+'</div></div></div><div class="news-content">'+esc(item.content)+'</div><div class="news-actions"><button class="like-btn'+(liked?' liked':'')+'" onclick="event.stopPropagation();toggleLike(\''+item.id+'\',this)">❤ <span>'+likes+'</span></button>'+(isMine?'<button class="self-btn" onclick="event.stopPropagation();editNews(\''+item.id+'\',\''+esc(item.content)+'\')">✏️</button><button class="self-del-btn" onclick="event.stopPropagation();delOwnNews(\''+item.id+'\')">撤销</button>':(authToken?'<button class="rpt-btn" onclick="event.stopPropagation();reportNews(\''+item.id+'\')">🚩</button>':''))+(adminIPOk&&!item.id.startsWith('seed-')?'<button class="news-del-btn" onclick="event.stopPropagation();delFromLib(\''+item.id+'\')">x</button>':'')+'</div></div>';}
+function newsCardHTML(item){const i=(item.username||'?')[0].toUpperCase(),c=getColor(item.username);const isMine=currentUser&&item.username===currentUser;const likes=parseInt(item.likes)||0;const liked=myLikes.has(item.id);return '<div class="news-card '+(item.pinned?'pinned':'')+'" data-id="'+item.id+'"><div class="news-header"><div class="news-avatar" style="background:'+c+'">'+i+'</div><div class="news-meta"><div class="news-username">'+esc(item.username)+' '+(item.pinned?'<span class="pin-badge">置顶</span>':'')+'</div><div class="news-time">'+fmt(item.time||item.created_at)+'</div></div></div><div class="news-content">'+esc(item.content)+'</div><div class="news-actions"><button class="like-btn'+(liked?' liked':'')+'" onclick="event.stopPropagation();toggleLike(\''+item.id+'\',this)">❤ <span>'+likes+'</span></button><button class="self-btn" onclick="event.stopPropagation();showComments(\''+item.id+'\')">💬</button>'+(isMine?'<button class="self-btn" onclick="event.stopPropagation();editNews(\''+item.id+'\',\''+esc(item.content)+'\')">✏️</button><button class="self-del-btn" onclick="event.stopPropagation();delOwnNews(\''+item.id+'\')">撤销</button>':(authToken?'<button class="rpt-btn" onclick="event.stopPropagation();reportNews(\''+item.id+'\')">🚩</button>':''))+(adminIPOk&&!item.id.startsWith('seed-')?'<button class="news-del-btn" onclick="event.stopPropagation();delFromLib(\''+item.id+'\')">x</button>':'')+'</div></div>';}
 function renderLeaderboard(lb){if(!lb||!lb.length){leaderboardList.innerHTML='<div class="empty-state small"><p>no</p></div>';return}leaderboardList.innerHTML=lb.map((u,i)=>{const r=i+1;let tc='',ri=r;if(r===1){tc='top-1';ri='1'}else if(r===2){tc='top-2';ri='2'}else if(r===3){tc='top-3';ri='3'}return '<div class="leaderboard-item '+tc+'"><div class="rank-badge">'+ri+'</div><div class="rank-avatar" style="background:'+(u.avatar||getColor(u.username))+'">'+u.username[0].toUpperCase()+'</div><div class="rank-name">'+esc(u.username)+'</div><div class="rank-count">'+u.count+'</div></div>';}).join('');}
 function renderLeaderboardFromData(){if(!libAll.length)return;const lb=Object.values(libAll.reduce((a,n)=>{if(!n.seed){if(!a[n.username])a[n.username]={username:n.username,count:0,avatar:getColor(n.username)};a[n.username].count++}return a},{})).sort((a,b)=>b.count-a.count).slice(0,20);renderLeaderboard(lb);}
 
