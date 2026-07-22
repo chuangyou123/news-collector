@@ -141,13 +141,29 @@ app.get('/api/me', async (req, res) => { const t = req.headers['authorization'] 
 
 // ── News API ──────────────────────────────────────
 app.get('/api/news', async (req, res) => {
-  if (pool) { res.json(await q(`SELECT n.id, n.username, n.content, n.pinned, n.created_at as time, COUNT(l.username) as likes FROM news n LEFT JOIN likes l ON n.id=l.news_id GROUP BY n.id ORDER BY n.pinned DESC, n.created_at DESC`)); }
-  else { const n = readJ(NEWS_FILE); res.json([...n.filter(x => x.pinned), ...n.filter(x => !x.pinned)]); }
+  if (pool) {
+    const t = req.headers['authorization'] || req.query.token || '';
+    const u = await verifyToken(t);
+    res.json(await q(
+      `SELECT n.id, n.username, n.content, n.pinned, n.created_at as time, COUNT(l.username) as likes,
+        ${u ? `EXISTS(SELECT 1 FROM likes WHERE news_id=n.id AND username=$1) as liked_by_me` : 'FALSE as liked_by_me'}
+      FROM news n LEFT JOIN likes l ON n.id=l.news_id GROUP BY n.id ORDER BY n.pinned DESC, n.created_at DESC`,
+      u ? [u] : []
+    ));
+  } else { const n = readJ(NEWS_FILE); res.json([...n.filter(x => x.pinned), ...n.filter(x => !x.pinned)]); }
 });
 app.get('/api/news/all', async (req, res) => {
   let userNews;
-  if (pool) userNews = await q(`SELECT n.id, n.username, n.content, n.pinned, n.created_at as time, COUNT(l.username) as likes FROM news n LEFT JOIN likes l ON n.id=l.news_id GROUP BY n.id ORDER BY n.pinned DESC, n.created_at DESC`);
-  else { const n = readJ(NEWS_FILE); userNews = [...n.filter(x => x.pinned), ...n.filter(x => !x.pinned)]; }
+  if (pool) {
+    const t = req.headers['authorization'] || req.query.token || '';
+    const u = await verifyToken(t);
+    userNews = await q(
+      `SELECT n.id, n.username, n.content, n.pinned, n.created_at as time, COUNT(l.username) as likes,
+        ${u ? `EXISTS(SELECT 1 FROM likes WHERE news_id=n.id AND username=$1) as liked_by_me` : 'FALSE as liked_by_me'}
+      FROM news n LEFT JOIN likes l ON n.id=l.news_id GROUP BY n.id ORDER BY n.pinned DESC, n.created_at DESC`,
+      u ? [u] : []
+    );
+  } else { const n = readJ(NEWS_FILE); userNews = [...n.filter(x => x.pinned), ...n.filter(x => !x.pinned)]; }
   res.json([...userNews, ...seedNews]);
 });
 app.get('/api/news/download', async (req, res) => {

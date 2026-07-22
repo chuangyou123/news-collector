@@ -65,7 +65,7 @@ searchInput.addEventListener('input',loadLibrary);
 downloadBtn.addEventListener('click',()=>{const a=document.createElement('a');a.href='/api/news/download';a.download='news-collection.txt';a.click();});
 
 // ═══ Socket ═══
-socket.on('init-data',data=>{publishNews=data.news;renderNews(data.news);renderLeaderboard(data.leaderboard);fetch('/api/news/count').then(r=>r.json()).then(d=>{totalCount.textContent=d.count;});loadAnnouncements();});
+socket.on('init-data',data=>{publishNews=data.news;data.news.forEach(n=>{if(n.liked_by_me)myLikes.add(n.id)});localStorage.setItem('myLikes',JSON.stringify([...myLikes]));renderNews(data.news);renderLeaderboard(data.leaderboard);fetch('/api/news/count').then(r=>r.json()).then(d=>{totalCount.textContent=d.count;});loadAnnouncements();});
 socket.on('news-added',item=>{publishNews.unshift(item);prependNews(item);fetch('/api/news/count').then(r=>r.json()).then(d=>totalCount.textContent=d.count);});
 socket.on('news-deleted',data=>{publishNews=publishNews.filter(n=>n.id!==data.id);const c=document.querySelector('[data-id="'+data.id+'"]');if(c){c.style.opacity='0';c.style.transition='.3s';setTimeout(()=>c.remove(),300)}fetch('/api/news/count').then(r=>r.json()).then(d=>totalCount.textContent=d.count);});
 socket.on('leaderboard-updated',lb=>renderLeaderboard(lb));
