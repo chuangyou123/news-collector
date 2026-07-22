@@ -24,15 +24,15 @@
     </div>
   </header>
 
-  <!-- 主 Tab 导航 -->
   <nav class="main-tabs">
     <button class="main-tab active" data-tab="publish">📝 发布新闻</button>
     <button class="main-tab" data-tab="library">📚 新闻库</button>
     <button class="main-tab" data-tab="rank">🏆 排行榜</button>
+    <select id="tagFilter" style="display:none;padding:6px 10px;border-radius:6px;border:1px solid #ccc"><option value="">全部标签</option></select>
+    <button id="darkToggle" style="margin-left:auto;background:none;border:none;font-size:1.2rem;cursor:pointer" title="深色模式">🌙</button>
     <span class="total-count">本站已收录 <strong id="totalCount">0</strong> 条新闻</span>
   </nav>
 
-  <!-- 公告栏 -->
   <div class="announce-banner" id="announceBanner" style="display:none">
     <div class="announce-inner">
       <span class="announce-icon">📢</span>
@@ -42,7 +42,6 @@
   </div>
 
   <div class="main-container">
-    <!-- Tab: 发布新闻 -->
     <div class="tab-content" id="tabPublish">
       <div class="upload-card" id="uploadCard" style="display:none;">
         <h3>📝 分享新闻</h3>
@@ -57,9 +56,9 @@
       <div class="news-list" id="newsList">
         <div class="empty-state"><div class="empty-icon">📭</div><p>还没有新闻</p></div>
       </div>
+      <div class="pagination" id="pagination"></div>
     </div>
 
-    <!-- Tab: 新闻库 -->
     <div class="tab-content" id="tabLibrary" style="display:none;">
       <div class="library-toolbar">
         <button id="downloadBtn" class="btn-primary">📥 下载全部新闻</button>
@@ -70,25 +69,17 @@
       </div>
     </div>
 
-    <!-- Tab: 排行榜 -->
     <div class="tab-content" id="tabRank" style="display:none;">
-      <div class="leaderboard-card">
-        <h3>🏆 上传排行榜</h3>
-        <div class="leaderboard-list" id="leaderboardList">
-          <div class="empty-state small"><p>暂无排名</p></div>
-        </div>
-      </div>
+      <div class="leaderboard-card"><h3>🏆 上传排行榜</h3><div class="leaderboard-list" id="leaderboardList"><div class="empty-state small"><p>暂无排名</p></div></div></div>
     </div>
   </div>
 
-  <!-- 管理员密钥弹窗 -->
   <div class="modal-overlay" id="adminKeyOverlay" style="display:none;">
     <div class="modal-box"><h3>🔐 管理员验证</h3><p class="modal-target">请输入管理员密钥</p><input type="password" id="adminKeyInput" placeholder="粘贴密钥" maxlength="300"><div class="modal-actions"><button id="adminKeyCancel" class="btn-outline">取消</button><button id="adminKeyConfirm" class="btn-primary">验证</button></div></div>
   </div>
 
-  <!-- 管理员面板 -->
   <div class="admin-overlay" id="adminOverlay" style="display:none;">
-    <div class="admin-panel"><div class="admin-panel-header"><h2>⚙️ 管理面板</h2><button id="adminCloseBtn" class="btn-close">✕</button></div><div class="admin-tabs"><button class="admin-tab active" data-tab="news">📰 每日新闻</button><button class="admin-tab" data-tab="users">👥 用户管理</button><button class="admin-tab" data-tab="announce">📢 公告</button></div><div class="admin-tab-content" id="tabNews"><div class="admin-toolbar"><input type="date" id="adminDateFilter" class="input-date"><button id="adminCopyToday" class="btn-sm btn-copy">📋 复制新闻</button></div><div class="admin-news-list" id="adminNewsList"></div></div><div class="admin-tab-content" id="tabUsers" style="display:none;"><div class="admin-user-list" id="adminUserList"></div></div><div class="admin-tab-content" id="tabAnnounce" style="display:none;"><input id="announceInput" style="width:100%;padding:8px;margin:8px 0;border:1px solid #ddd;border-radius:6px" placeholder="输入公告内容..."><button class="btn-primary" onclick="postAnnounce()" style="margin-bottom:12px">📢 发布公告</button><div id="announceList"></div></div></div>
+    <div class="admin-panel"><div class="admin-panel-header"><h2>⚙️ 管理面板</h2><button id="adminCloseBtn" class="btn-close">✕</button></div><div class="admin-tabs"><button class="admin-tab active" data-tab="news">📰 每日新闻</button><button class="admin-tab" data-tab="users">👥 用户管理</button><button class="admin-tab" data-tab="announce">📢 公告</button><button class="admin-tab" data-tab="reports">🚩 举报</button></div><div class="admin-tab-content" id="tabNews"><div class="admin-toolbar"><input type="date" id="adminDateFilter" class="input-date"><button id="adminCopyToday" class="btn-sm btn-copy">📋 复制新闻</button></div><div class="admin-news-list" id="adminNewsList"></div></div><div class="admin-tab-content" id="tabUsers" style="display:none;"><div class="admin-user-list" id="adminUserList"></div></div><div class="admin-tab-content" id="tabAnnounce" style="display:none;"><input id="announceInput" style="width:100%;padding:8px;margin:8px 0;border:1px solid #ddd;border-radius:6px" placeholder="输入公告内容..."><button class="btn-primary" onclick="postAnnounce()" style="margin-bottom:12px">📢 发布公告</button><div id="announceList"></div></div><div class="admin-tab-content" id="tabReports" style="display:none;"><div class="admin-user-list" id="adminReportList"></div></div></div>
   </div>
 
   <div class="modal-overlay" id="pwdModalOverlay" style="display:none;">
