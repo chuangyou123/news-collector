@@ -150,15 +150,23 @@ app.post('/api/register', async (req, res) => {
 
 app.post('/api/login', async (req, res) => {
   const ip = getIP(req);
-  if (!checkRate(ip, 'login', 10, 900)) return res.status(429).json({ error: '登录尝试过多，请15分钟后再试' });
   const { username, password } = req.body;
   const un = (username || '').trim();
   if (!un || !password) return res.status(400).json({ error: '请输入昵称和密码' });
+  
+  // 检查是否已被限流（不管对错都先检查）
+  const key = ip + ':login';
+  const rl = rateLimit.get(key);
+  if (rl && rl.count >= 10) return res.status(429).json({ error: '登录尝试过多，请15分钟后再试' });
+  
   const user = await getUser(un);
-  if (!user) return res.status(400).json({ error: '用户不存在' });
+  if (!user) { checkRate(ip, 'login', 10, 900); return res.status(400).json({ error: '用户不存在' }); }
   if (user.banned) return res.status(403).json({ error: '已封禁' });
   const h = user.passwordHash || user.password_hash;
-  if (hash(password, user.salt) !== h) return res.status(400).json({ error: '密码错误' });
+  if (hash(password, user.salt) !== h) { checkRate(ip, 'login', 10, 900); return res.status(400).json({ error: '密码错误' }); }
+  
+  // 密码正确 → 清除限流计数
+  rateLimit.delete(key);
   res.json({ success: true, token: await createToken(un), username: un });
 });
 
