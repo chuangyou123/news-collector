@@ -108,6 +108,30 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
 // ── Reset winster ─────────────────────────────────
+// ── AI 自动分类 ──────────────────────────────────
+async function autoClassify(newsId, content) {
+  try {
+    const tags = await q('SELECT name FROM tags');
+    const tagNames = tags.map(t => t.name).join('、');
+    const res = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.DEEPSEEK_KEY },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [{ role: 'user', content: `将以下新闻分类为以下标签之一：${tagNames}。只回复标签名，不要其他内容。\n\n新闻：${content.slice(0,200)}` }],
+        max_tokens: 10, temperature: 0
+      })
+    });
+    const data = await res.json();
+    const label = (data.choices?.[0]?.message?.content || '').trim();
+    if (label && tags.some(t => t.name === label)) {
+      const t = await q1('SELECT id FROM tags WHERE name=$1', [label]);
+      if (t) await pool.query('INSERT INTO news_tags(news_id,tag_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [newsId, t.id]);
+      console.log('🤖 AI分类:', label);
+    }
+  } catch (e) { console.log('AI分类失败:', e.message); }
+}
+
 app.post('/api/reset-winster', async (req, res) => {
   if (req.body.key !== ADMIN_KEY) return res.status(403).json({ error: '密钥错误' });
   const uname = req.body.username || 'winster';
@@ -251,6 +275,10 @@ app.post('/api/news', authMW, async (req, res) => {
     if (tag && pool) {
       const t = await q1('SELECT id FROM tags WHERE name=$1', [tag]);
       if (t) await pool.query('INSERT INTO news_tags(news_id,tag_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [id, t.id]);
+    }
+    // AI自动分类（异步，不阻塞响应）
+    if (pool && process.env.DEEPSEEK_KEY && !tag) {
+      autoClassify(id, content).catch(()=>{});
     }
   } else {
     const n = readJ(NEWS_FILE); n.unshift({ id, username: req.currentUser, content, pinned: false, time: new Date().toISOString() }); writeJ(NEWS_FILE, n);
