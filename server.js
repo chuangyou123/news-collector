@@ -208,13 +208,13 @@ app.post('/api/news/:id/like', authMW, async (req, res) => {
     const existing = await q1('SELECT * FROM likes WHERE news_id=$1 AND username=$2', [id, username]);
     if (existing) {
       await pool.query('DELETE FROM likes WHERE news_id=$1 AND username=$2', [id, username]);
-      res.json({ liked: false });
     } else {
       await pool.query('INSERT INTO likes(news_id,username) VALUES($1,$2)', [id, username]);
-      res.json({ liked: true });
     }
+    const r = await q1('SELECT COUNT(*) as c FROM likes WHERE news_id=$1', [id]);
+    res.json({ liked: !existing, count: parseInt(r.c) });
   } else {
-    res.json({ liked: false });
+    res.json({ liked: false, count: 0 });
   }
 });
 
