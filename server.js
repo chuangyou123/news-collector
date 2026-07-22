@@ -12,6 +12,27 @@ const io = new Server(server);
 const ADMIN_IPS = ['26.100.68.199', '192.168.10.21', '127.0.0.1', '::1', '::ffff:127.0.0.1', '2409:8a55:e1:fbe4:6447:5fe:90ed:7749'];
 const ADMIN_KEY = process.env.ADMIN_KEY || '2d384f9ba42ae0aac8a0e65d4ef40a3698969866981f4d10676dddf923778b9b98d40f89546ce4aa95e414c1caad064f91d78fa97ffbdca8dd8e35120653fc29f019bf4582ab2e18159aff67f44a1eb658bb44776503f304233ad4edc62b08e3b9b1ebcb0c411da948bbf1824a2586643d6c29b87a80ec4153b37051e0d67359';
 
+// ── 安全防护 ──────────────────────────────────────
+const rateLimit = new Map(); // IP -> { action:count, reset:timestamp }
+function checkRate(ip, action, max, windowSec = 60) {
+  const key = ip + ':' + action;
+  const now = Date.now();
+  let r = rateLimit.get(key);
+  if (!r || now > r.reset) { r = { count: 0, reset: now + windowSec * 1000 }; rateLimit.set(key, r); }
+  r.count++;
+  if (r.count > max) return false;
+  return true;
+}
+// 定期清理
+setInterval(() => { const now = Date.now(); for (const [k, v] of rateLimit) { if (now > v.reset) rateLimit.delete(k); } }, 60000);
+
+function strongPassword(pw) {
+  if (pw.length < 6) return '密码至少6位';
+  if (!/[a-zA-Z]/.test(pw)) return '密码需包含字母';
+  if (!/[0-9]/.test(pw)) return '密码需包含数字';
+  return null;
+}
+
 // ── PG 或 JSON ────────────────────────────────────
 let pg = null;
 try { pg = require('pg'); } catch {}
@@ -100,9 +121,13 @@ app.post('/api/reset-winster', async (req, res) => {
 
 // ── Auth API ──────────────────────────────────────
 app.post('/api/register', async (req, res) => {
+  const ip = getIP(req);
+  if (!checkRate(ip, 'register', 3, 3600)) return res.status(429).json({ error: '注册太频繁，请稍后再试' });
   const { username, password } = req.body;
   const un = (username || '').trim();
-  if (!un || !password || password.length < 4) return res.status(400).json({ error: '参数错误' });
+  const pwErr = strongPassword(password);
+  if (pwErr) return res.status(400).json({ error: pwErr });
+  if (!un || !password) return res.status(400).json({ error: '参数错误' });
   if (!/^[\w\u4e00-\u9fa5]{2,20}$/.test(un)) return res.status(400).json({ error: '昵称格式不对' });
   if (await getUser(un)) return res.status(400).json({ error: '该昵称已被注册' });
   const ip = getIP(req);
@@ -125,6 +150,8 @@ app.post('/api/register', async (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
+  const ip = getIP(req);
+  if (!checkRate(ip, 'login', 10, 900)) return res.status(429).json({ error: '登录尝试过多，请15分钟后再试' });
   const { username, password } = req.body;
   const un = (username || '').trim();
   if (!un || !password) return res.status(400).json({ error: '请输入昵称和密码' });
@@ -180,6 +207,8 @@ app.get('/api/news/count', async (req, res) => {
 });
 
 app.post('/api/news', authMW, async (req, res) => {
+  const ip = getIP(req);
+  if (!checkRate(ip, 'news', 5, 60)) return res.status(429).json({ error: '发布太频繁，请稍后再试' });
   let content = (req.body.content || '').trim();
   content = sanitize2(content);
   const l = [...content].length;
@@ -241,6 +270,8 @@ app.get('/api/admin/check', async (req, res) => {
   res.json({ allowed: !!(await verifyToken(t) && await isAdminUser(await verifyToken(t))) });
 });
 app.post('/api/admin/auth', async (req, res) => {
+  const ip = getIP(req);
+  if (!checkRate(ip, 'admin-auth', 5, 300)) return res.status(429).json({ error: '尝试过多' });
   if (!isAdminIP(req)) { const t = req.headers['authorization'] || req.query.token; const u = await verifyToken(t); if (!u || !(await isAdminUser(u))) return res.status(403).json({ error: '拒绝访问' }); }
   if (req.body.key !== ADMIN_KEY) return res.status(403).json({ error: '密钥错误' });
   res.json({ success: true });
