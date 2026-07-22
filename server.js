@@ -244,6 +244,12 @@ app.post('/api/news', authMW, async (req, res) => {
   if (pool) {
     await pool.query('INSERT INTO news(id,username,content) VALUES($1,$2,$3)', [id, req.currentUser, content]);
     await pool.query('UPDATE users SET count=count+1 WHERE username=$1', [req.currentUser]);
+    // 标签
+    const tag = (req.body.tag || '').trim();
+    if (tag && pool) {
+      const t = await q1('SELECT id FROM tags WHERE name=$1', [tag]);
+      if (t) await pool.query('INSERT INTO news_tags(news_id,tag_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [id, t.id]);
+    }
   } else {
     const n = readJ(NEWS_FILE); n.unshift({ id, username: req.currentUser, content, pinned: false, time: new Date().toISOString() }); writeJ(NEWS_FILE, n);
     const u = readJ(USERS_FILE); if (u[req.currentUser]) { u[req.currentUser].count++; writeJ(USERS_FILE, u); }

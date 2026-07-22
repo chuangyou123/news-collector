@@ -816,4 +816,8 @@ body.dark input,.dark textarea { background:#1e293b;color:#e2e8f0;border-color:#
 body.dark .btn-outline,.dark .btn-sm { background:#334155;color:#e2e8f0;border-color:#475569 }
 body.dark .empty-state,.dark .empty-state p { color:#94a3b8 }
 body.dark .announce-inner { background:linear-gradient(135deg,#1e293b,#0f172a) }
+body.dark .total-count { background:#1e293b;color:#94a3b8 }
+body.dark .total-count strong { color:#818CF8 }
+body.dark .pagination .page-btn { background:#1e293b;color:#e2e8f0;border-color:#475569 }
+body.dark .pagination .page-btn.active { background:#4F46E5 }
 
