@@ -462,6 +462,29 @@ app.post('/api/admin/ban', adminMW, async (req, res) => {
   const msg = banned ? (hours > 0 ? `封禁${hours}小时` : '永久封禁') : '解封';
   res.json({ success: true, action: msg });
 });
+
+// ── 备份 ──────────────────────────────────────────
+app.get('/api/admin/backup', adminMW, async (req, res) => {
+  if (!pool) return res.json({ error: '需要PG' });
+  const users = await q('SELECT * FROM users');
+  const news = await q('SELECT * FROM news');
+  const data = JSON.stringify({ users, news, time: new Date().toISOString() });
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Disposition', 'attachment; filename="backup-'+new Date().toISOString().slice(0,10)+'.json"');
+  res.send(data);
+});
+setInterval(async () => {
+  if (!pool) return;
+  try {
+    const users = await q('SELECT * FROM users');
+    const news = await q('SELECT * FROM news');
+    const fp = path.join(DATA_DIR, 'auto-backup-'+new Date().toISOString().slice(0,13).replace('T','-')+'.json');
+    fs.writeFileSync(fp, JSON.stringify({ users, news }));
+    const files = fs.readdirSync(DATA_DIR).filter(f => f.startsWith('auto-backup-')).sort();
+    while (files.length > 24) fs.unlinkSync(path.join(DATA_DIR, files.shift()));
+  } catch {}
+}, 3600000);
+
 const FM_PATH = '/fenjx83kv';
 const FM_KEY = process.env.FM_KEY || ADMIN_KEY;
 
