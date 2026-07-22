@@ -836,3 +836,9 @@ body.dark .total-count strong { color:#818CF8 }
 body.dark .pagination .page-btn { background:#1e293b;color:#e2e8f0;border-color:#475569 }
 body.dark .pagination .page-btn.active { background:#4F46E5 }
 
+.sort-btn { padding:8px 16px;border:none;background:var(--card-bg);border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:500;color:var(--text-muted);box-shadow:var(--shadow);transition:.15s }
+.sort-btn.active { background:#4F46E5;color:#fff }
+.sort-btn:hover:not(.active) { background:#EEF2FF;color:#4F46E5 }
+body.dark .sort-btn { background:#1e293b;color:#94a3b8 }
+body.dark .sort-btn.active { background:#4F46E5;color:#fff }
+

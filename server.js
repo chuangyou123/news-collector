@@ -213,6 +213,7 @@ app.get('/api/news', async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 30, 100);
   const offset = (page - 1) * limit;
   const tag = req.query.tag || '';
+  const sort = req.query.sort || 'new';
   if (pool) {
     const t = req.headers['authorization'] || req.query.token || '';
     const u = await verifyToken(t);
@@ -223,7 +224,7 @@ app.get('/api/news', async (req, res) => {
     const params = u ? [u] : [];
     let paramIdx = params.length;
     if (tag) { sql += ` JOIN news_tags nt ON n.id=nt.news_id JOIN tags tg ON nt.tag_id=tg.id WHERE tg.name=$${++paramIdx}`; params.push(tag); }
-    sql += ` GROUP BY n.id ORDER BY n.pinned DESC, n.created_at DESC LIMIT $${++paramIdx} OFFSET $${++paramIdx}`;
+    sql += ` GROUP BY n.id ORDER BY n.pinned DESC, ${sort==='hot'?'COUNT(DISTINCT l.username) DESC':'n.created_at DESC'} LIMIT $${++paramIdx} OFFSET $${++paramIdx}`;
     params.push(limit, offset);
     const rows = await q(sql, params);
     const countR = await q1(tag

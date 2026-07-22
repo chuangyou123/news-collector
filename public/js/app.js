@@ -56,8 +56,21 @@ logoutBtn.addEventListener('click',()=>{if(authToken)fetch('/api/logout',{method
 async function checkAdminIP(){try{const r=await fetch('/api/admin/check',{headers:authToken?{Authorization:authToken}:{}});const d=await r.json();adminIPOk=d.allowed;if(adminIPOk)adminBtn.style.display='inline-block';}catch{adminIPOk=false;}}
 // 标签
 let selectedTag='';
-async function loadTags(){try{const r=await fetch('/api/tags');const tags=await r.json();const s=$('#tagFilter');const ts=$('#tagSelect');const opts='<option value=\"\">全部标签</option>'+tags.map(t=>'<option value=\"'+t.name+'\">'+t.name+'</option>').join('');if(s){s.innerHTML=opts;s.style.display='inline-block';s.addEventListener('change',async()=>{selectedTag=s.value;await filterByTag()})}if(ts){ts.innerHTML='<option value=\"\">选择标签（可选）</option>'+tags.map(t=>'<option value=\"'+t.name+'\">'+t.name+'</option>').join('')}}catch{}}
-async function filterByTag(){const h=authToken?{Authorization:authToken}:{};const tag=selectedTag?'&tag='+selectedTag:'';const r=await fetch('/api/news?limit=50'+tag,{headers:h});const d=await r.json();const list=d.items||d;renderNews(list)}
+let currentSort='new';
+document.querySelectorAll('.sort-btn').forEach(b=>b.addEventListener('click',function(){
+  document.querySelectorAll('.sort-btn').forEach(x=>x.classList.remove('active'));
+  this.classList.add('active');
+  currentSort=this.dataset.sort;
+  reloadWithSort();
+}));
+async function reloadWithSort(){
+  const h=authToken?{Authorization:authToken}:{};
+  const tag=selectedTag?'&tag='+selectedTag:'';
+  const r=await fetch('/api/news?limit=30&sort='+currentSort+tag,{headers:h});
+  const d=await r.json();renderNews(d.items||d);
+}
+async function loadTags(){try{const r=await fetch('/api/tags');const tags=await r.json();const s=$('#tagFilter');const ts=$('#tagSelect');const opts='<option value=\"\">全部标签</option>'+tags.map(t=>'<option value=\"'+t.name+'\">'+t.name+'</option>').join('');if(s){s.innerHTML=opts;s.style.display='inline-block';s.addEventListener('change',async()=>{selectedTag=s.value;await reloadWithSort()})}if(ts){ts.innerHTML='<option value=\"\">选择标签（可选）</option>'+tags.map(t=>'<option value=\"'+t.name+'\">'+t.name+'</option>').join('')}}catch{}}
+async function filterByTag(){selectedTag=$('#tagFilter').value;await reloadWithSort()}
 setTimeout(loadTags,800);
 
 // 通知
