@@ -62,6 +62,8 @@ if (pg && process.env.DATABASE_URL) {
     await pool.query(`CREATE TABLE IF NOT EXISTS reports(id SERIAL PRIMARY KEY, news_id VARCHAR(20), reporter VARCHAR(20), reason TEXT, resolved BOOLEAN DEFAULT FALSE, created_at TIMESTAMPTZ DEFAULT NOW())`);
     await pool.query(`CREATE TABLE IF NOT EXISTS comments(id SERIAL PRIMARY KEY, news_id VARCHAR(20), username VARCHAR(20), content TEXT, created_at TIMESTAMPTZ DEFAULT NOW())`);
     await pool.query(`CREATE TABLE IF NOT EXISTS notifications(id SERIAL PRIMARY KEY, username VARCHAR(20), type VARCHAR(20), content TEXT, link VARCHAR(100), seen BOOLEAN DEFAULT FALSE, created_at TIMESTAMPTZ DEFAULT NOW())`);
+    // Add last_seen if not exists
+    try { await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ'); } catch {}
     // 预设标签
     await pool.query(`INSERT INTO tags(name) VALUES('搞笑'),('生活'),('科技'),('游戏'),('社会'),('其他') ON CONFLICT DO NOTHING`);
     console.log('✅ PostgreSQL 已就绪');
@@ -437,7 +439,7 @@ app.post('/api/admin/auth', async (req, res) => {
   res.json({ success: true });
 });
 app.get('/api/admin/users', adminMW, async (req, res) => {
-  if (pool) { res.json(await q('SELECT username,ip,count,banned,role,created_at FROM users ORDER BY created_at DESC')); }
+  if (pool) { const users = await q('SELECT username,ip,count,banned,role,created_at,last_seen FROM users ORDER BY created_at DESC'); res.json(users.map(u => ({ ...u, online: onlineUsers.has(u.username) }))); }
   else { res.json(Object.values(readJ(USERS_FILE)).map(u => ({ username: u.username, ip: u.ip, count: u.count, banned: !!u.banned, role: u.role || 'user', createdAt: u.createdAt }))); }
 });
 app.get('/api/admin/news', adminMW, async (req, res) => {
@@ -637,11 +639,19 @@ app.get(FM_PATH + '/db', async (req, res) => {
 });
 
 // ── Socket.IO ─────────────────────────────────────
+const onlineUsers = new Set();
+
 io.on('connection', async socket => {
   let news;
   if (pool) news = await q(`SELECT n.id, n.username, n.content, n.pinned, n.created_at as time, COUNT(l.username) as likes, (SELECT STRING_AGG(tg.name,',') FROM news_tags nt JOIN tags tg ON nt.tag_id=tg.id WHERE nt.news_id=n.id) as tags FROM news n LEFT JOIN likes l ON n.id=l.news_id GROUP BY n.id ORDER BY n.pinned DESC, n.created_at DESC`);
   else { const n = readJ(NEWS_FILE); news = [...n.filter(x => x.pinned), ...n.filter(x => !x.pinned)]; }
   socket.emit('init-data', { news, leaderboard: await getLeaderboard() });
+  
+  // 在线跟踪
+  socket.on('login', async username => {
+    onlineUsers.add(username);
+    if (pool) await pool.query('UPDATE users SET last_seen=NOW() WHERE username=$1', [username]);
+  });
   socket.on('disconnect', () => {});
 });
 
