@@ -32,7 +32,7 @@ let currentUser=null,authToken=null,mode='login',adminIPOk=false,adminKey=null;
 let allNews=[],publishNews=[],myLikes=new Set(JSON.parse(localStorage.getItem('myLikes')||'[]'));
 
 // ═══ Main Tabs ═══
-mainTabs.forEach(t=>t.addEventListener('click',()=>{
+mainTabs.forEach(t=>t.addEventListener('click',async()=>{
   mainTabs.forEach(x=>x.classList.remove('active'));t.classList.add('active');
   const tab=t.dataset.tab;
   tabPublish.style.display=tab==='publish'?'block':'none';
