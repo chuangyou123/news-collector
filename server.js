@@ -57,6 +57,11 @@ if (pg && process.env.DATABASE_URL) {
     await pool.query(`CREATE TABLE IF NOT EXISTS warnings(id SERIAL PRIMARY KEY, username VARCHAR(20), reason TEXT, warned_by VARCHAR(20), created_at TIMESTAMPTZ DEFAULT NOW())`);
     await pool.query(`CREATE TABLE IF NOT EXISTS announcements(id SERIAL PRIMARY KEY, content TEXT, created_by VARCHAR(20), created_at TIMESTAMPTZ DEFAULT NOW())`);
     await pool.query(`CREATE TABLE IF NOT EXISTS likes(news_id VARCHAR(20), username VARCHAR(20), PRIMARY KEY(news_id, username))`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS tags(id SERIAL PRIMARY KEY, name VARCHAR(20) UNIQUE)`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS news_tags(news_id VARCHAR(20), tag_id INT, PRIMARY KEY(news_id, tag_id))`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS reports(id SERIAL PRIMARY KEY, news_id VARCHAR(20), reporter VARCHAR(20), reason TEXT, resolved BOOLEAN DEFAULT FALSE, created_at TIMESTAMPTZ DEFAULT NOW())`);
+    // 预设标签
+    await pool.query(`INSERT INTO tags(name) VALUES('搞笑'),('生活'),('科技'),('游戏'),('社会'),('其他') ON CONFLICT DO NOTHING`);
     console.log('✅ PostgreSQL 已就绪');
   })().catch(e => { console.log('PG init error:', e.message); pool = null; });
 }
@@ -175,16 +180,28 @@ app.get('/api/me', async (req, res) => { const t = req.headers['authorization'] 
 
 // ── News API ──────────────────────────────────────
 app.get('/api/news', async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = Math.min(parseInt(req.query.limit) || 30, 100);
+  const offset = (page - 1) * limit;
+  const tag = req.query.tag || '';
   if (pool) {
     const t = req.headers['authorization'] || req.query.token || '';
     const u = await verifyToken(t);
-    res.json(await q(
-      `SELECT n.id, n.username, n.content, n.pinned, n.created_at as time, COUNT(l.username) as likes,
-        ${u ? `EXISTS(SELECT 1 FROM likes WHERE news_id=n.id AND username=$1) as liked_by_me` : 'FALSE as liked_by_me'}
-      FROM news n LEFT JOIN likes l ON n.id=l.news_id GROUP BY n.id ORDER BY n.pinned DESC, n.created_at DESC`,
-      u ? [u] : []
-    ));
-  } else { const n = readJ(NEWS_FILE); res.json([...n.filter(x => x.pinned), ...n.filter(x => !x.pinned)]); }
+    let sql = `SELECT n.id, n.username, n.content, n.pinned, n.created_at as time, COUNT(DISTINCT l.username) as likes,
+      ${u ? `EXISTS(SELECT 1 FROM likes WHERE news_id=n.id AND username=$1) as liked_by_me` : 'FALSE as liked_by_me'},
+      (SELECT STRING_AGG(tg.name,',') FROM news_tags nt JOIN tags tg ON nt.tag_id=tg.id WHERE nt.news_id=n.id) as tags
+      FROM news n LEFT JOIN likes l ON n.id=l.news_id`;
+    const params = u ? [u] : [];
+    let paramIdx = params.length;
+    if (tag) { sql += ` JOIN news_tags nt ON n.id=nt.news_id JOIN tags tg ON nt.tag_id=tg.id WHERE tg.name=$${++paramIdx}`; params.push(tag); }
+    sql += ` GROUP BY n.id ORDER BY n.pinned DESC, n.created_at DESC LIMIT $${++paramIdx} OFFSET $${++paramIdx}`;
+    params.push(limit, offset);
+    const rows = await q(sql, params);
+    const countR = await q1(tag
+      ? `SELECT COUNT(DISTINCT n.id) as c FROM news n JOIN news_tags nt ON n.id=nt.news_id JOIN tags tg ON nt.tag_id=tg.id WHERE tg.name=$1`
+      : `SELECT COUNT(*) as c FROM news`, tag ? [tag] : []);
+    res.json({ items: rows, page, totalPages: Math.ceil((countR?.c || 0) / limit), total: parseInt(countR?.c || 0) });
+  } else { const n = readJ(NEWS_FILE); res.json({ items: [...n.filter(x => x.pinned), ...n.filter(x => !x.pinned)], page: 1, totalPages: 1, total: n.length }); }
 });
 app.get('/api/news/all', async (req, res) => {
   let userNews;
@@ -235,6 +252,44 @@ app.post('/api/news', authMW, async (req, res) => {
   io.emit('news-added', item);
   io.emit('leaderboard-updated', await getLeaderboard());
   res.json({ success: true, news: item });
+});
+
+// 编辑自己的新闻
+app.put('/api/news/:id', authMW, async (req, res) => {
+  const { id } = req.params;
+  let content = (req.body.content || '').trim();
+  content = sanitize2(content);
+  if ([...content].length < 5) return res.status(400).json({ error: '至少5个字符' });
+  if (pool) {
+    const item = await q1('SELECT * FROM news WHERE id=$1', [id]);
+    if (!item) return res.status(404).json({ error: '不存在' });
+    if (item.username !== req.currentUser) return res.status(403).json({ error: '只能编辑自己的新闻' });
+    await pool.query('UPDATE news SET content=$1 WHERE id=$2', [content, id]);
+  }
+  res.json({ success: true });
+});
+
+// 标签列表
+app.get('/api/tags', async (req, res) => {
+  if (pool) res.json(await q('SELECT * FROM tags ORDER BY id'));
+  else res.json([]);
+});
+
+// 举报
+app.post('/api/news/:id/report', authMW, async (req, res) => {
+  const { id } = req.params;
+  const reason = (req.body.reason || '').trim();
+  if (!reason) return res.status(400).json({ error: '请输入举报理由' });
+  if (pool) {
+    await pool.query('INSERT INTO reports(news_id,reporter,reason) VALUES($1,$2,$3)', [id, req.currentUser, reason]);
+  }
+  res.json({ success: true });
+});
+
+// 获取举报列表(管理员)
+app.get('/api/admin/reports', adminMW, async (req, res) => {
+  if (pool) res.json(await q('SELECT r.*,n.content as news_content FROM reports r JOIN news n ON r.news_id=n.id ORDER BY r.created_at DESC'));
+  else res.json([]);
 });
 
 // 用户删除自己的新闻
