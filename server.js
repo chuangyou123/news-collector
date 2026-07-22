@@ -60,6 +60,8 @@ if (pg && process.env.DATABASE_URL) {
     await pool.query(`CREATE TABLE IF NOT EXISTS tags(id SERIAL PRIMARY KEY, name VARCHAR(20) UNIQUE)`);
     await pool.query(`CREATE TABLE IF NOT EXISTS news_tags(news_id VARCHAR(20), tag_id INT, PRIMARY KEY(news_id, tag_id))`);
     await pool.query(`CREATE TABLE IF NOT EXISTS reports(id SERIAL PRIMARY KEY, news_id VARCHAR(20), reporter VARCHAR(20), reason TEXT, resolved BOOLEAN DEFAULT FALSE, created_at TIMESTAMPTZ DEFAULT NOW())`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS comments(id SERIAL PRIMARY KEY, news_id VARCHAR(20), username VARCHAR(20), content TEXT, created_at TIMESTAMPTZ DEFAULT NOW())`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS notifications(id SERIAL PRIMARY KEY, username VARCHAR(20), type VARCHAR(20), content TEXT, link VARCHAR(100), seen BOOLEAN DEFAULT FALSE, created_at TIMESTAMPTZ DEFAULT NOW())`);
     // 预设标签
     await pool.query(`INSERT INTO tags(name) VALUES('搞笑'),('生活'),('科技'),('游戏'),('社会'),('其他') ON CONFLICT DO NOTHING`);
     console.log('✅ PostgreSQL 已就绪');
@@ -329,6 +331,53 @@ app.post('/api/news/:id/like', authMW, async (req, res) => {
   } else {
     res.json({ liked: false, count: 0 });
   }
+});
+
+// ── 评论 ──────────────────────────────────────────
+app.get('/api/news/:id/comments', async (req, res) => {
+  if (pool) res.json(await q('SELECT * FROM comments WHERE news_id=$1 ORDER BY created_at ASC', [req.params.id]));
+  else res.json([]);
+});
+
+app.post('/api/news/:id/comments', authMW, async (req, res) => {
+  const content = (req.body.content || '').trim();
+  if (!content || content.length < 1) return res.status(400).json({ error: '内容不能为空' });
+  if (pool) {
+    await pool.query('INSERT INTO comments(news_id,username,content) VALUES($1,$2,$3)', [req.params.id, req.currentUser, content]);
+    // 通知新闻作者
+    const n = await q1('SELECT username FROM news WHERE id=$1', [req.params.id]);
+    if (n && n.username !== req.currentUser) {
+      await pool.query("INSERT INTO notifications(username,type,content,link) VALUES($1,'comment',$2,$3)", [n.username, req.currentUser+' 评论了你的新闻', '/#news-'+req.params.id]);
+    }
+  }
+  res.json({ success: true });
+});
+
+// ── 通知 ──────────────────────────────────────────
+app.get('/api/notifications', authMW, async (req, res) => {
+  if (pool) res.json(await q('SELECT * FROM notifications WHERE username=$1 ORDER BY created_at DESC LIMIT 30', [req.currentUser]));
+  else res.json([]);
+});
+app.post('/api/notifications/read', authMW, async (req, res) => {
+  if (pool) await pool.query('UPDATE notifications SET seen=TRUE WHERE username=$1', [req.currentUser]);
+  res.json({ success: true });
+});
+
+// ── 统计 ──────────────────────────────────────────
+app.get('/api/admin/stats', adminMW, async (req, res) => {
+  if (!pool) return res.json({});
+  const users = await q1('SELECT COUNT(*) as c FROM users');
+  const news = await q1('SELECT COUNT(*) as c FROM news');
+  const today = await q1("SELECT COUNT(*) as c FROM news WHERE created_at::date=CURRENT_DATE");
+  const likes = await q1('SELECT COUNT(*) as c FROM likes');
+  res.json({ users: parseInt(users.c), news: parseInt(news.c), today: parseInt(today.c), likes: parseInt(likes.c) });
+});
+
+// ── 自定义头像颜色 ────────────────────────────────
+app.post('/api/user/color', authMW, async (req, res) => {
+  const color = req.body.color || '';
+  if (pool) await pool.query('UPDATE users SET avatar=$1 WHERE username=$2', [color, req.currentUser]);
+  res.json({ success: true });
 });
 
 // ── Admin API ─────────────────────────────────────
