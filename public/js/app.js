@@ -89,8 +89,7 @@ window.postComment=async function(id){
   await fetch('/api/news/'+id+'/comments',{method:'POST',headers:{'Content-Type':'application/json',Authorization:authToken},body:JSON.stringify({content:c.value.trim()})});
   document.querySelector('[data-id=\"'+id+'\"] .cmt-section')?.remove();
   window.showComments(id);
-};
-window.postComment=async function(id){const c=document.getElementById('cmtInput');if(!c||!c.value.trim())return;await fetch('/api/news/'+id+'/comments',{method:'POST',headers:{'Content-Type':'application/json',Authorization:authToken},body:JSON.stringify({content:c.value.trim()})});document.querySelector('[style*=\"z-index:400\"]')?.remove();window.showComments(id)};
+}
 
 // ═══ Publish ═══
 contentInput.addEventListener('input',()=>{charCount.textContent=contentInput.value.length+'/500';});
