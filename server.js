@@ -370,7 +370,8 @@ app.get('/api/admin/stats', adminMW, async (req, res) => {
   const news = await q1('SELECT COUNT(*) as c FROM news');
   const today = await q1("SELECT COUNT(*) as c FROM news WHERE created_at::date=CURRENT_DATE");
   const likes = await q1('SELECT COUNT(*) as c FROM likes');
-  res.json({ users: parseInt(users.c), news: parseInt(news.c), today: parseInt(today.c), likes: parseInt(likes.c) });
+  const daily = await q("SELECT created_at::date as date, COUNT(*) as count FROM news WHERE created_at > NOW() - INTERVAL '7 days' GROUP BY date ORDER BY date");
+  res.json({ users: parseInt(users.c), news: parseInt(news.c), today: parseInt(today.c), likes: parseInt(likes.c), daily });
 });
 
 // ── 自定义头像颜色 ────────────────────────────────
