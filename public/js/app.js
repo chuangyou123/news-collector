@@ -77,7 +77,7 @@ window.showComments=async function(id){
   sec=document.createElement('div');
   sec.className='cmt-section';
   let h=list.map(c=>'<div class=\"cmt-item\"><b>'+esc(c.username)+'</b> '+esc(c.content)+' <span class=\"cmt-time\">'+fmt(c.created_at)+'</span></div>').join('');
-  if(authToken)h+='<div class=\"cmt-input-row\"><input id=\"cmtInput'+id+'\" placeholder=\"写评论...\"><button onclick=\"postComment(\\''+id+'\\')\">发送</button></div>';
+  if(authToken)h+='<div class=\"cmt-input-row\"><input id=\"cmtInput'+id+'\" placeholder=\"写评论...\"><button onclick=\"postComment(\''+id+'\')\">发送</button></div>';
   sec.innerHTML=h;
   card.appendChild(sec);
 };
