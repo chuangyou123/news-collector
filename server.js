@@ -162,14 +162,17 @@ app.post('/api/register', async (req, res) => {
   if (!/^[\w\u4e00-\u9fa5]{2,20}$/.test(un)) return res.status(400).json({ error: '昵称格式不对' });
   if (await getUser(un)) return res.status(400).json({ error: '该昵称已被注册' });
   if (pool) {
-    const r = await q1('SELECT username FROM users WHERE ip=$1', [ip]);
-    if (r) return res.status(400).json({ error: `该IP已注册过「${r.username}」` });
+    // 管理员IP跳过IP限制
+    if (!isAdminIP(req)) {
+      const r = await q1('SELECT username FROM users WHERE ip=$1', [ip]);
+      if (r) return res.status(400).json({ error: `该IP已注册过「${r.username}」` });
+    }
     const s = rsalt();
     const role = (un === 'winster' || un === 'Winster') ? 'superadmin' : 'user';
     await pool.query('INSERT INTO users(username,password_hash,salt,ip,role,avatar) VALUES($1,$2,$3,$4,$5,$6)', [un, hash(password, s), s, ip, role, avatar(un)]);
   } else {
     const u = readJ(USERS_FILE);
-    if (Object.values(u).find(x => x.ip === ip)) return res.status(400).json({ error: '该IP已注册' });
+    if (!isAdminIP(req) && Object.values(u).find(x => x.ip === ip)) return res.status(400).json({ error: '该IP已注册' });
     const s = rsalt();
     const r2 = (un === 'winster' || un === 'Winster') ? 'superadmin' : 'user';
     u[un] = { username: un, passwordHash: hash(password, s), salt: s, ip, count: 0, banned: false, role: r2, avatar: avatar(un), createdAt: new Date().toISOString() };
