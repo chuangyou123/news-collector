@@ -130,7 +130,6 @@ app.post('/api/register', async (req, res) => {
   if (!un || !password) return res.status(400).json({ error: '参数错误' });
   if (!/^[\w\u4e00-\u9fa5]{2,20}$/.test(un)) return res.status(400).json({ error: '昵称格式不对' });
   if (await getUser(un)) return res.status(400).json({ error: '该昵称已被注册' });
-  const ip = getIP(req);
   if (pool) {
     const r = await q1('SELECT username FROM users WHERE ip=$1', [ip]);
     if (r) return res.status(400).json({ error: `该IP已注册过「${r.username}」` });
