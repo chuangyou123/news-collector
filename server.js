@@ -64,6 +64,10 @@ if (pg && process.env.DATABASE_URL) {
     await pool.query(`CREATE TABLE IF NOT EXISTS notifications(id SERIAL PRIMARY KEY, username VARCHAR(20), type VARCHAR(20), content TEXT, link VARCHAR(100), seen BOOLEAN DEFAULT FALSE, created_at TIMESTAMPTZ DEFAULT NOW())`);
     // Add last_seen if not exists
     try { await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ'); } catch {}
+    try { await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS signature VARCHAR(100)'); } catch {}
+    try { await pool.query('ALTER TABLE comments ADD COLUMN IF NOT EXISTS reply_to INT'); } catch {}
+    await pool.query(`CREATE TABLE IF NOT EXISTS follows(follower VARCHAR(20), following VARCHAR(20), PRIMARY KEY(follower, following))`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS achievements(username VARCHAR(20), badge VARCHAR(30), earned_at TIMESTAMPTZ DEFAULT NOW(), PRIMARY KEY(username, badge))`);
     // 预设标签
     await pool.query(`INSERT INTO tags(name) VALUES('搞笑'),('生活'),('科技'),('游戏'),('社会'),('其他') ON CONFLICT DO NOTHING`);
     console.log('✅ PostgreSQL 已就绪');
@@ -132,6 +136,22 @@ async function autoClassify(newsId, content) {
       console.log('🤖 AI分类:', label);
     }
   } catch (e) { console.log('AI分类失败:', e.message); }
+}
+
+// 成就系统
+async function checkAchievements(username) {
+  if (!pool) return;
+  const badges = [];
+  const newsCount = parseInt((await q1('SELECT COUNT(*) as c FROM news WHERE username=$1', [username])).c);
+  const likesReceived = parseInt((await q1('SELECT COUNT(*) as c FROM likes l JOIN news n ON l.news_id=n.id WHERE n.username=$1', [username])).c);
+  if (newsCount >= 1) badges.push('初来乍到');
+  if (newsCount >= 10) badges.push('发帖达人');
+  if (newsCount >= 50) badges.push('新闻大师');
+  if (likesReceived >= 5) badges.push('点赞新星');
+  if (likesReceived >= 50) badges.push('人气之王');
+  for (const b of badges) {
+    await pool.query('INSERT INTO achievements(username,badge) VALUES($1,$2) ON CONFLICT DO NOTHING', [username, b]);
+  }
 }
 
 app.post('/api/reset-winster', async (req, res) => {
@@ -293,6 +313,7 @@ app.post('/api/news', authMW, async (req, res) => {
   const item = { id, username: req.currentUser, content, pinned: false, time: new Date().toISOString() };
   io.emit('news-added', item);
   io.emit('leaderboard-updated', await getLeaderboard());
+  checkAchievements(req.currentUser).catch(()=>{});
   res.json({ success: true, news: item });
 });
 
@@ -414,6 +435,61 @@ app.post('/api/user/color', authMW, async (req, res) => {
   if (pool) await pool.query('UPDATE users SET avatar=$1 WHERE username=$2', [color, req.currentUser]);
   res.json({ success: true });
 });
+
+// 个人主页
+app.get('/api/user/:username', async (req, res) => {
+  const u = await getUser(req.params.username);
+  if (!u) return res.status(404).json({ error: '用户不存在' });
+  const newsCount = pool ? (await q1('SELECT COUNT(*) as c FROM news WHERE username=$1', [req.params.username])).c : 0;
+  const achievements = pool ? await q('SELECT badge, earned_at FROM achievements WHERE username=$1', [req.params.username]) : [];
+  res.json({ username: u.username, signature: u.signature||'', avatar: u.avatar, role: u.role, newsCount, achievements, createdAt: u.created_at, last_seen: u.last_seen, online: onlineUsers.has(u.username) });
+});
+
+// 用户新闻列表
+app.get('/api/user/:username/news', async (req, res) => {
+  if (pool) res.json(await q('SELECT * FROM news WHERE username=$1 ORDER BY created_at DESC LIMIT 50', [req.params.username]));
+  else res.json([]);
+});
+
+// 更新签名
+app.put('/api/user/signature', authMW, async (req, res) => {
+  const sig = (req.body.signature||'').slice(0,100);
+  if (pool) await pool.query('UPDATE users SET signature=$1 WHERE username=$2', [sig, req.currentUser]);
+  res.json({ success: true });
+});
+
+// 关注
+app.post('/api/user/:username/follow', authMW, async (req, res) => {
+  if (req.params.username === req.currentUser) return res.status(400).json({ error: '不能关注自己' });
+  if (pool) await pool.query('INSERT INTO follows(follower,following) VALUES($1,$2) ON CONFLICT DO NOTHING', [req.currentUser, req.params.username]);
+  res.json({ success: true });
+});
+app.post('/api/user/:username/unfollow', authMW, async (req, res) => {
+  if (pool) await pool.query('DELETE FROM follows WHERE follower=$1 AND following=$2', [req.currentUser, req.params.username]);
+  res.json({ success: true });
+});
+app.get('/api/user/:username/following', async (req, res) => {
+  if (pool) res.json(await q('SELECT following FROM follows WHERE follower=$1', [req.params.username]));
+  else res.json([]);
+});
+
+// 热榜
+app.get('/api/news/hot', async (req, res) => {
+  const hours = parseInt(req.query.hours)||24;
+  if (pool) res.json(await q(`SELECT n.*, COUNT(l.username) as likes FROM news n LEFT JOIN likes l ON n.id=l.news_id WHERE n.created_at > NOW() - INTERVAL '${hours} hours' GROUP BY n.id ORDER BY COUNT(l.username) DESC LIMIT 20`));
+  else res.json([]);
+});
+
+// RSS
+app.get('/api/rss', async (req, res) => {
+  const news = pool ? await q('SELECT content, username, created_at FROM news ORDER BY created_at DESC LIMIT 30') : [];
+  let xml='<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>新闻收集站</title><link>https://news-collector-production-431e.up.railway.app</link>';
+  news.forEach(n=>{xml+='<item><title>'+escXML(n.username)+': '+escXML((n.content||'').slice(0,50))+'</title><description>'+escXML(n.content||'')+'</description><pubDate>'+new Date(n.created_at).toUTCString()+'</pubDate></item>'});
+  xml+='</channel></rss>';
+  res.set('Content-Type','application/rss+xml; charset=utf-8');
+  res.send(xml);
+});
+function escXML(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 app.post('/api/admin/assign-tag', adminMW, async (req, res) => {
   const { id, tag } = req.body;
