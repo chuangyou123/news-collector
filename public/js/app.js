@@ -41,7 +41,7 @@ mainTabs.forEach(t=>t.addEventListener('click',async()=>{
   tabRank.style.display=tab==='rank'?'block':'none';
   tabPublish.style.display=(tab==='publish'||tab==='hot')?'block':'none';
   const sr=document.querySelector('.sort-row');if(sr)sr.style.display=tab==='publish'?'flex':'none';
-  if(tab==='publish')reloadWithSort();
+  if(tab==='publish')await reloadWithSort();
   if(tab==='library')loadLibrary();
   if(tab==='rank'){if(!libAll.length)await loadLibrary();renderLeaderboardFromData();}
   if(tab==='hot')loadHotNews();
