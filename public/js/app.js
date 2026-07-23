@@ -46,7 +46,7 @@ mainTabs.forEach(t=>t.addEventListener('click',async()=>{
   if(tab==='library')loadLibrary();
   if(tab==='rank'){if(!libAll.length)await loadLibrary();renderLeaderboardFromData();}
   if(tab==='hot')loadHotNews();
-  if(tab==='hot')loadHotNews();
+  if(tab==='follow')loadFollowingFeed();
 }));
 
 // ═══ Auth ═══
