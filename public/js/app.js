@@ -42,6 +42,7 @@ mainTabs.forEach(t=>t.addEventListener('click',async()=>{
   const sr=document.querySelector('.sort-row');if(sr)sr.style.display=tab==='publish'?'flex':'none';
   if(tab==='library')loadLibrary();
   if(tab==='rank'){if(!libAll.length)await loadLibrary();renderLeaderboardFromData();}
+  if(tab==='hot')loadHotNews();
 }));
 
 // ═══ Auth ═══
@@ -74,6 +75,12 @@ async function reloadWithSort(){
 async function loadTags(){try{const r=await fetch('/api/tags');const tags=await r.json();const s=$('#tagFilter');const ts=$('#tagSelect');const opts='<option value=\"\">全部标签</option>'+tags.map(t=>'<option value=\"'+t.name+'\">'+t.name+'</option>').join('');if(s){s.innerHTML=opts;s.style.display='inline-block';s.addEventListener('change',async()=>{selectedTag=s.value;await reloadWithSort()})}if(ts){ts.innerHTML='<option value=\"\">选择标签（可选）</option>'+tags.map(t=>'<option value=\"'+t.name+'\">'+t.name+'</option>').join('')}}catch{}}
 async function filterByTag(){selectedTag=$('#tagFilter').value;await reloadWithSort()}
 setTimeout(loadTags,800);
+
+async function loadHotNews(){
+  const r=await fetch('/api/news/hot?hours=24');
+  const list=await r.json();
+  newsList.innerHTML=list.length?list.map((n,i)=>'<div class="news-card"><div class="news-header"><span style="color:#F97316;font-weight:700">#'+(i+1)+'</span> '+esc(n.username)+'</div><div class="news-content">'+esc((n.content||'').slice(0,100))+'</div><span style="color:#EF4444">❤ '+n.likes+'</span></div>').join(''):'<div class="empty-state"><p>暂无热门新闻</p></div>';
+}
 
 // 通知
 const notifBtn=$('#notifBtn'),notifBadge=$('#notifBadge');
