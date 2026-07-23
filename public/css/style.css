@@ -843,3 +843,5 @@ body.dark .pagination .page-btn.active { background:#4F46E5 }
 body.dark .sort-btn { background:#1e293b;color:#94a3b8 }
 body.dark .sort-btn.active { background:#4F46E5;color:#fff }
 
+
+.news-uname{cursor:pointer;color:#4F46E5;font-weight:600}.news-uname:hover{text-decoration:underline}
