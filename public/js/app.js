@@ -117,6 +117,50 @@ window.postComment=async function(id){
 contentInput.addEventListener('input',()=>{charCount.textContent=contentInput.value.length+'/500';});
 newsForm.addEventListener('submit',async e=>{e.preventDefault();const c=contentInput.value.trim();if([...c].length<5){showToast('至少5字符','error');return}if(!authToken){showToast('请先登录','error');return}const btn=newsForm.querySelector('button');btn.disabled=true;btn.textContent='...';try{const tag=$('#tagSelect').value;const r=await fetch('/api/news',{method:'POST',headers:{'Content-Type':'application/json',Authorization:authToken},body:JSON.stringify({content:c,tag})});if(!r.ok){const d=await r.json();throw new Error(d.error)}contentInput.value='';charCount.textContent='0/500';showToast('发布成功','success')}catch(e){showToast(e.message,'error')}finally{btn.disabled=false;btn.textContent='发布';}});
 
+// 个人主页弹窗
+window.showProfile=async function(username){
+  const r=await fetch('/api/user/'+username);
+  const u=await r.json();
+  if(!u.username)return;
+  const bg=document.createElement('div');
+  bg.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:400;display:flex;align-items:center;justify-content:center';
+  bg.onclick=function(e){if(e.target===bg)bg.remove()};
+  const box=document.createElement('div');
+  box.style.cssText='background:#fff;border-radius:16px;padding:24px;max-width:400px;width:90%';
+  const avatar=document.createElement('div');
+  avatar.style.cssText='width:50px;height:50px;border-radius:50%;background:'+(u.avatar||'#54A0FF')+';display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.3rem;font-weight:700;margin:0 auto 12px';
+  avatar.textContent=u.username[0].toUpperCase();
+  const name=document.createElement('div');
+  name.style.cssText='text-align:center;font-weight:700;font-size:1.1rem;margin-bottom:4px';
+  name.innerHTML=esc(u.username)+(u.online?' <span style="color:#10B981;font-size:.7rem">●在线</span>':'')+(u.role==='superadmin'?' 👑':u.role==='admin'?' 🔧':'');
+  const sig=document.createElement('div');
+  sig.style.cssText='text-align:center;color:#888;font-size:.8rem;margin-bottom:12px';
+  sig.textContent=u.signature||'这个人很懒，什么都没写';
+  box.appendChild(avatar);box.appendChild(name);box.appendChild(sig);
+  if(u.username===currentUser){
+    const inp=document.createElement('input');
+    inp.id='sigInput';inp.style.cssText='width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;margin-bottom:8px;box-sizing:border-box';inp.placeholder='修改签名...';
+    const btn=document.createElement('button');btn.className='btn-sm';btn.textContent='保存签名';btn.onclick=updateSignature;
+    box.appendChild(inp);box.appendChild(btn);
+  }else{
+    const btn=document.createElement('button');btn.className='btn-sm';btn.textContent='➕ 关注';btn.onclick=function(){followUser(u.username)};
+    box.appendChild(btn);
+  }
+  const stats=document.createElement('div');
+  stats.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0';
+  stats.innerHTML='<div style="text-align:center;padding:8px;background:#f5f5f5;border-radius:8px"><div style="font-weight:700">'+u.newsCount+'</div><div style="font-size:.75rem;color:#888">新闻</div></div><div style="text-align:center;padding:8px;background:#f5f5f5;border-radius:8px"><div style="font-weight:700">'+(u.achievements||[]).length+'</div><div style="font-size:.75rem;color:#888">成就</div></div>';
+  box.appendChild(stats);
+  if(u.achievements&&u.achievements.length){
+    const ach=document.createElement('div');
+    ach.style.cssText='display:flex;flex-wrap:wrap;gap:4px;margin-top:8px';
+    u.achievements.forEach(a=>{const s=document.createElement('span');s.style.cssText='background:#FEF3C7;color:#D97706;padding:2px 8px;border-radius:10px;font-size:.75rem';s.textContent=a.badge;ach.appendChild(s)});
+    box.appendChild(ach);
+  }
+  bg.appendChild(box);document.body.appendChild(bg);
+};
+window.updateSignature=async function(){const s=document.getElementById('sigInput');if(s){await fetch('/api/user/signature',{method:'PUT',headers:{'Content-Type':'application/json',Authorization:authToken},body:JSON.stringify({signature:s.value})});showToast('签名已更新','success')}};
+window.followUser=async function(u){await fetch('/api/user/'+u+'/follow',{method:'POST',headers:{Authorization:authToken}});showToast('已关注 '+u,'success')};
+
 // ═══ News Library ═══
 let libPage=0,libAll=[];
 async function loadLibrary(){try{const r=await fetch('/api/news/all');libAll=await r.json()}catch{libAll=libAll||[]}libPage=0;renderLibrary()}
