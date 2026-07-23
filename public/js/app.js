@@ -39,9 +39,11 @@ mainTabs.forEach(t=>t.addEventListener('click',async()=>{
   tabPublish.style.display=tab==='publish'?'block':'none';
   tabLibrary.style.display=tab==='library'?'block':'none';
   tabRank.style.display=tab==='rank'?'block':'none';
+  tabPublish.style.display=(tab==='publish'||tab==='hot')?'block':'none';
   const sr=document.querySelector('.sort-row');if(sr)sr.style.display=tab==='publish'?'flex':'none';
   if(tab==='library')loadLibrary();
   if(tab==='rank'){if(!libAll.length)await loadLibrary();renderLeaderboardFromData();}
+  if(tab==='hot')loadHotNews();
   if(tab==='hot')loadHotNews();
 }));
 
