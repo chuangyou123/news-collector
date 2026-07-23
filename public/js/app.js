@@ -36,7 +36,7 @@ let allNews=[],publishNews=[],myLikes=new Set(JSON.parse(localStorage.getItem('m
 mainTabs.forEach(t=>t.addEventListener('click',async()=>{
   mainTabs.forEach(x=>x.classList.remove('active'));t.classList.add('active');
   const tab=t.dataset.tab;
-  tabPublish.style.display=tab==='publish'?'block':'none';
+  tabPublish.style.display=(tab==='publish'||tab==='hot')?'block':'none';
   tabLibrary.style.display=tab==='library'?'block':'none';
   tabRank.style.display=tab==='rank'?'block':'none';
   tabPublish.style.display=(tab==='publish'||tab==='hot')?'block':'none';
