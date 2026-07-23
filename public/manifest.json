@@ -1,1 +1,1 @@
-{"name":"新闻收集站","short_name":"新闻站","description":"实时新闻收集与分享平台，支持点赞、评论、分类标签、AI智能分类","start_url":"/","display":"standalone","background_color":"#F1F5F9","theme_color":"#4F46E5"}
+{"name":"新闻收集站","short_name":"新闻站","description":"实时新闻收集与分享平台，支持点赞、评论、分类标签、AI智能分类","start_url":"/","display":"standalone","background_color":"#F1F5F9","theme_color":"#4F46E5","icons":[{"src":"/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}]}
