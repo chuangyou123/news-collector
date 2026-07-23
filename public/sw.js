@@ -1,4 +1,4 @@
-const CACHE='news-v2';
+const CACHE='news-v3';
 const ASSETS=['/','/css/style.css','/js/app.js','/manifest.json'];
 
 self.addEventListener('install',e=>{

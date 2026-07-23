@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════
 //  新闻收集站 — 三Tab版 v2
 // ═══════════════════════════════════════════════
-if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js');
+if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js?v=3');
 const socket = io();
 const $ = s => document.querySelector(s);
 
