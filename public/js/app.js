@@ -144,7 +144,7 @@ window.showProfile=async function(username){
     const btn=document.createElement('button');btn.className='btn-sm';btn.textContent='保存签名';btn.onclick=updateSignature;
     box.appendChild(inp);box.appendChild(btn);
   }else{
-    const btn=document.createElement('button');btn.className='btn-sm';btn.textContent='➕ 关注';btn.onclick=function(){followUser(u.username)};
+    const btn=document.createElement('button');btn.className='btn-sm';btn.textContent='➕ 关注';btn.onclick=function(){if(!authToken){showToast('请先登录','error');return}followUser(u.username)};
     box.appendChild(btn);
   }
   const stats=document.createElement('div');
