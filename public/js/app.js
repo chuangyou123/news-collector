@@ -196,7 +196,7 @@ window.showProfile=async function(username){
   document.body.appendChild(d);
 };
 window.updateSignature=async function(){const s=$('#sigInput');if(s){await fetch('/api/user/signature',{method:'PUT',headers:{'Content-Type':'application/json',Authorization:authToken},body:JSON.stringify({signature:s.value})});showToast('签名已更新','success')}};
-window.followUser=async function(u){await fetch('/api/user/'+u+'/follow',{method:'POST',headers:{Authorization:authToken}});showToast('已关注 '+u,'success')};
+
 
 // 自定义颜色
 window.pickColor=function(){const c=prompt('输入颜色 (如 #FF6B6B 或 red)：','#4F46E5');if(c)fetch('/api/user/color',{method:'POST',headers:{'Content-Type':'application/json',Authorization:authToken},body:JSON.stringify({color:c})}).then(()=>location.reload())};
@@ -270,6 +270,22 @@ window.postAnnounce=async()=>{const c=announceInput.value.trim();if(!c){showToas
 async function loadAdminAnnouncements(){try{const r=await fetch('/api/announcements');const list=await r.json();announceList.innerHTML=list.length?list.map(a=>'<div style="padding:8px;border-bottom:1px solid #ddd;display:flex;justify-content:space-between"><span>'+esc(a.content)+' <span style="color:#888;font-size:.75rem">- '+a.created_by+' '+fmt(a.created_at)+'</span></span><button class="btn-sm" style="background:#FEE2E2;color:#DC2626" onclick="delAnnounce('+a.id+')">x</button></div>').join(''):'<div class="empty-state small"><p>no announcements</p></div>'}catch(e){}}
 window.delAnnounce=async(id)=>{try{await fetch('/api/admin/announcement/'+id,{method:'DELETE',headers:adminHeaders()});loadAdminAnnouncements()}catch{}};
 window.warnUser=async(u)=>{const reason=prompt('警告理由：');if(!reason)return;try{const r=await fetch('/api/admin/warn',{method:'POST',headers:{'Content-Type':'application/json',...adminHeaders(),'x-user-token':authToken},body:JSON.stringify({username:u,reason})});const d=await r.json();if(!r.ok)throw new Error(d.error);showToast('⚠ '+d.action+' ('+d.count+'/3次)','success');loadAdminUsers()}catch(e){showToast(e.message,'error')}};
+
+// 关注动态
+async function loadFollowingFeed(){
+  if(!currentUser)return;
+  const r=await fetch('/api/user/'+currentUser+'/following');
+  const followed=await r.json();
+  if(!followed.length){newsList.innerHTML='<div class="empty-state"><p>还没有关注任何人</p></div>';return}
+  let allNews=[];
+  for(const f of followed){
+    const res=await fetch('/api/user/'+f.following+'/news');
+    const n=await res.json();
+    allNews=[...allNews,...n];
+  }
+  allNews.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  newsList.innerHTML=allNews.length?allNews.map(n=>'<div class="news-card"><div class="news-header"><b>'+esc(n.username)+'</b></div><div class="news-content">'+esc((n.content||'').slice(0,150))+'</div></div>').join(''):'<div class="empty-state"><p>关注的人还没有发新闻</p></div>';
+}
 
 // ═══ Utils ═══
 function getColor(n){const c=['#FF6B6B','#FF9F43','#FECA57','#54A0FF','#5F27CD','#01A3A4','#F368E0','#2ED573','#FF6348','#7BED9F','#70A1FF','#5352ED','#FF4757','#1E90FF','#2ED573'];let h=0;for(let i=0;i<n.length;i++)h=n.charCodeAt(i)+((h<<5)-h);return c[Math.abs(h)%c.length];}
