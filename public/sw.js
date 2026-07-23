@@ -1,5 +1,5 @@
-const CACHE='news-v3';
-const ASSETS=['/','/css/style.css','/js/app.js','/manifest.json'];
+const CACHE='news-v4';
+const ASSETS=['/','/css/style.css','/js/app.js?v=3','/manifest.json'];
 
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()));
